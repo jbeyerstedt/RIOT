@@ -33,7 +33,7 @@
 /**
  * @ingroup     FW
  * @file
- * @brief       Generator for OTA firmware update files
+ * @brief       Metadata generation for OTA FW images
  *
  * @author      Mark Solters <msolters@gmail.com>
  * @author      Francisco Acosta <francisco.acosta@inria.fr>
@@ -45,11 +45,11 @@
 #include <string.h>
 #include <sys/resource.h>
 
-#include "fw_slots.h"
+#include "ota_slots.h"
 #include "hashes/sha256.h"
 
-#ifndef FW_METADATA_SPACE
-#define FW_METADATA_SPACE           (0x200)
+#ifndef OTA_FW_METADATA_SPACE
+#define OTA_FW_METADATA_SPACE       (0x040)     /* default value only */
 #endif
 
 /* Input firmware .bin file */
@@ -62,16 +62,13 @@ uint32_t firmware_size = 0;
 
 int main(int argc, char *argv[])
 {
-    FW_metadata_t metadata;
-    sha256_context_t firmware_sha256;
-    uint8_t output_buffer[sizeof(FW_metadata_t)];
-    int bytes_read = 0;
-    uint8_t firmware_buffer[1024];
+    OTA_FW_metadata_t metadata;
+    uint8_t output_buffer[sizeof(OTA_FW_metadata_t)];
 
     (void)argc;
 
     if (!argv[1]) {
-        printf("Please provide a .bin file to perform SHA256 on as the first argument.\n");
+        printf("Please provide a .bin file as the first argument.\n");
         return -1;
     }
 
@@ -81,68 +78,60 @@ int main(int argc, char *argv[])
     }
 
     if (!argv[3]) {
-        printf("Please provide a 32-bit hex UUID integer as the third argument.\n");
+        printf("Please provide a 32-bit hex hardware id integer as the third argument.\n");
         return -1;
     }
 
-    /* (1) Open the firmware .bin file */
-    firmware_bin = fopen(argv[1], "r");
-
-    sha256_init(&firmware_sha256);
-
-    while((bytes_read = fread(firmware_buffer, 1, sizeof(firmware_buffer), firmware_bin))) {
-        sha256_update(&firmware_sha256, firmware_buffer, bytes_read);
-        firmware_size += bytes_read;
+    if (!argv[4]) {
+        printf("Please provide a 32-bit hex firmware base address as the fourth argument.\n");
+        return -1;
     }
-    sha256_final(&firmware_sha256, metadata.hash);
 
-    printf("Firmware bytes read: %u\n", firmware_size);
-
-    /* Close the .bin file. */
+    /* Get the size of the firmware .bin file */
+    firmware_bin = fopen(argv[1], "r");
+    fseek(firmware_bin, 0L, SEEK_END);
+    firmware_size = ftell(firmware_bin);
     fclose(firmware_bin);
 
-    /*
-     * TODO Sign hash
-     */
-    for (unsigned long i = 0; i < sizeof(metadata.shash); i++) {
-        metadata.shash[i] = 0;
-    }
-
     /* Generate FW image metadata */
-
+    metadata.magic = 0x544f4952;        /* RIOT as hex */
+    sscanf(argv[3], "%lx", (uint64_t *)&(metadata.hw_id));
+    for (int i = 0; i < 16; i++) {      /* set chip id to 0 */
+        metadata.chip_id[i] = 0x00U;
+    }
+    sscanf(argv[2], "%hx", &(metadata.fw_vers));
+    sscanf(argv[4], "%x", &(metadata.fw_base_addr));
     metadata.size = firmware_size;
-    sscanf(argv[2], "%xu", (unsigned int *)&(metadata.version));
-    sscanf(argv[3], "%xu", &(metadata.uuid));
-    memcpy(output_buffer, (uint8_t*)&metadata, sizeof(FW_metadata_t));
 
-    printf("Firmware Size: %d\n", metadata.size);
-    printf("Firmware Version: %#x\n", metadata.version);
-    printf("Firmware UUID: %#x\n", metadata.uuid);
-    printf("Firmware HASH: ");
-    for (unsigned long i = 0; i < sizeof(metadata.hash); i++) {
-        printf("%02x ", metadata.hash[i]);
+    printf("Firmware HW ID: ");
+    for (unsigned long i = 0; i < sizeof(metadata.hw_id); i++) {
+        printf("%02x ", metadata.hw_id[i]);
     }
     printf("\n");
-    printf("Firmware signed HASH: ");
-    for (unsigned long i = 0; i < sizeof(metadata.shash); i++) {
-        printf("%02x ", metadata.shash[i]);
+    printf("Chip ID: ");
+    for (unsigned long i = 0; i < sizeof(metadata.chip_id); i++) {
+        printf("%02x ", metadata.chip_id[i]);
     }
     printf("\n");
+    printf("Firmware Version: %#x\n", metadata.fw_vers);
+    printf("Firmware Base Address: %#x\n", metadata.fw_base_addr);
+    printf("Firmware Size: %d Byte (0x%02x)\n", metadata.size, metadata.size);
+
+
+    memcpy(output_buffer, (uint8_t*)&metadata, sizeof(OTA_FW_metadata_t));
 
     /* Open the output firmware .bin file */
-    metadata_bin = fopen("firmware-metadata.bin", "w");
+    metadata_bin = fopen("ota_fw_metadata.bin", "w");
 
     /* Write the metadata */
-    printf("Metadata size: %lu\n", sizeof(FW_metadata_t));
+    printf("Metadata size: 0x%02lx\n", sizeof(OTA_FW_metadata_t));
     fwrite(output_buffer, sizeof(output_buffer), 1, metadata_bin);
 
     /* 0xff spacing until firmware binary starts */
-    uint8_t blank_buffer[FW_METADATA_SPACE - sizeof(FW_metadata_t)];
-
+    uint8_t blank_buffer[OTA_FW_METADATA_SPACE - sizeof(OTA_FW_metadata_t)];
     for (unsigned long b = 0; b < sizeof(blank_buffer); b++) {
         blank_buffer[b] = 0xff;
     }
-
     fwrite(blank_buffer, sizeof(blank_buffer), 1, metadata_bin);
 
     /* Close the metadata file */

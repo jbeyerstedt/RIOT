@@ -110,7 +110,7 @@ extern "C" {
 #define FW_SLOT_2_START_SECTOR      (5)
 #define FW_SLOT_2_SIZE              (0x20000)
 #define FW_SLOT_2_END               FW_SLOT_2 + FW_SLOT_2_SIZE
-#endif /* FLASHPAGE_SIZE */
+#endif /* defined(FLASH_SECTORS) */
 
 #ifdef FW_SLOTS
     #if FW_SLOT == 1
