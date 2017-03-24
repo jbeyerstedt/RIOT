@@ -60,12 +60,18 @@ extern "C" {
 #define OTA_FW_METADATA_LENGTH  sizeof(OTA_FW_metadata_t)
 
 /**
+ *  @brief OTA_FW_SIGN_LEN:
+ *         length of the (encrypted) firmware signature.
+ */
+#define OTA_FW_SIGN_LEN   64    /* 32 Byte SHA256 + 32 Byte null padding */
+
+/**
  * @brief Structure to store firmware metadata, 4 byte aligned
  * @{
  */
 typedef struct OTA_FW_metadata_t {
     uint32_t magic;                     /**< magic number to identify metadata struct */
-    uint8_t hw_id[8];                  /**< id of the specific hardware */
+    uint8_t hw_id[8];                   /**< id of the specific hardware */
     uint8_t chip_id[16];                /**< optional chip serial number */
     uint16_t fw_vers;                   /**< version number of the firmware */
     uint32_t fw_base_addr;              /**< flash address, where vector table starts */

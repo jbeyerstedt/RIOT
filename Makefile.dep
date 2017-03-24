@@ -621,6 +621,16 @@ ifneq (,$(filter fw_slots,$(USEMODULE)))
   USEMODULE += hashes
 endif
 
+ifneq (,$(filter ota_slots,$(USEMODULE)))
+  ifneq (,$(filter -DFLASH_SECTORS,$(CFLAGS)))
+    FEATURES_REQUIRED += periph_flashsector
+  else
+    FEATURES_REQUIRED += periph_flashpage
+  endif
+  FEATURES_REQUIRED += periph_slots
+  USEMODULE += hashes
+endif
+
 # include package dependencies
 -include $(USEPKG:%=$(RIOTPKG)/%/Makefile.dep)
 
