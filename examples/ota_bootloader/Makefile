@@ -18,7 +18,13 @@ BOOTLOADER = 1
 # Change this to 0 show compiler invocation lines by default:
 QUIET ?= 1
 
-# Use fw_slots module to manage images on ROM
-USEMODULE += fw_slots
+# Modules to include:
+USEMODULE += shell
+
+# Use ota_slots module to manage images on ROM
+USEMODULE += ota_slots
+
+# TweetNaCl needs a lot of stack
+CFLAGS += '-DTHREAD_STACKSIZE_MAIN=(THREAD_STACKSIZE_DEFAULT + 2048)'
 
 include $(RIOTBASE)/Makefile.include

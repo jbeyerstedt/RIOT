@@ -7,11 +7,11 @@
  */
 
 /**
- * @addtogroup      cpu_stm32f1
+ * @addtogroup      cpu_stm32f4
  * @{
  *
  * @file
- * @brief           Memory definitions for the STM32F103RE Slot 0
+ * @brief           Memory definitions for the STM32F103RE Slot 1
  *
  * @author          Francisco Acosta <francisco.acosta@inria.fr>
  *

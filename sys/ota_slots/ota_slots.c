@@ -41,6 +41,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <tweetnacl.h>
 #include "ota_slots.h"
 #include "cpu_conf.h"
 #include "irq.h"
@@ -54,34 +55,182 @@
 #define ENABLE_DEBUG (0)
 #include "debug.h"
 
-#define HASH_BUF             (1024)
-
-static uint8_t firmware_buffer[HASH_BUF];
+static uint8_t firmware_buffer[1024];
 
 /**
- * @brief       Read internal flash to a buffer at specific address.
+ * @brief      Read internal flash to a buffer at specific address.
  *
- * @param[in]   address - Address to be read.
- * @param[in]   count - count in bytes.
+ * @param[in]  address - Address to be read.
+ * @param[in]  count - count in bytes.
  *
- * @param[out]  data_buffer - The buffer filled with the read information.
+ * @param[out] data_buffer - The buffer filled with the read information.
  *
  */
 static void int_flash_read(uint8_t *data_buffer, uint32_t address, uint32_t count)
 {
-    uint8_t *read_addres = (uint8_t*)address;
+    uint8_t *read_addres = (uint8_t *)address;
+
     while (count--) {
         *data_buffer++ = *read_addres++;
     }
 }
 
-int ota_slots_validate_int_slot(uint8_t fw_slot)
+/**
+ * @brief      Get the internal metadata belonging to an FW slot in internal
+ *             flash, using the flash page.
+ *
+ * @param[in]  fw_address           The FW slot address to be read for metadata.
+ *
+ * @param[out] *fw_metadata         Pointer to the FW_metadata_t struct where
+ *                                  the metadata is to be written.
+ *
+ * @return     0 on success or error code
+ */
+int ota_slots_get_int_metadata(uint32_t fw_address, OTA_FW_metadata_t *fw_metadata)
 {
-    /*
-     * TODO
-     */
+    uint32_t fw_meta_address = fw_address + OTA_VTOR_ALIGN - OTA_FW_METADATA_SPACE;
+
+    DEBUG("[ota_slots] Getting internal metadata at address %#lx\n", fw_meta_address);
+    int_flash_read((uint8_t *)fw_metadata, fw_meta_address, sizeof(OTA_FW_metadata_t));
 
     return 0;
+}
+
+/**
+ * @brief      Get the firmware signature (inner signature) of the given
+ *             firmware slot.
+ *
+ * @param[in]  fw_slot              The FW slot to get the signature from.
+ *
+ * @return     flash address of the firmware signature
+ */
+uint32_t ota_slots_get_fw_signature_addr(uint8_t fw_slot)
+{
+    uint32_t slot_addr = ota_slots_get_slot_address(fw_slot);
+
+    return slot_addr + OTA_VTOR_ALIGN - OTA_FW_HEADER_SPACE;
+}
+
+void ota_slots_print_metadata(OTA_FW_metadata_t *metadata)
+{
+    printf("\nFirmware metadata dump:\n");
+    printf("Firmware HW ID: ");
+    for (unsigned long i = 0; i < sizeof(metadata->hw_id); i++) {
+        printf("%02x ", metadata->hw_id[i]);
+    }
+    printf("\n");
+    printf("Chip ID: ");
+    for (unsigned long i = 0; i < sizeof(metadata->chip_id); i++) {
+        printf("%02x ", metadata->chip_id[i]);
+    }
+    printf("\n");
+    printf("Firmware Version: %#x\n", metadata->fw_vers);
+    printf("Firmware Base Address: %#lx\n", metadata->fw_base_addr);
+    printf("Firmware Size: %ld Byte (0x%02lx)\n", metadata->size, metadata->size);
+    printf("\n");
+}
+
+int ota_slots_validate_int_slot(uint8_t fw_slot)
+{
+    OTA_FW_metadata_t fw_metadata;
+    uint32_t fw_image_address;
+    uint32_t address;
+    uint16_t rest;
+    sha256_context_t sha256_ctx;
+    uint8_t hash[SHA256_DIGEST_LENGTH];
+    uint8_t sign_hash[SHA256_DIGEST_LENGTH + crypto_box_ZEROBYTES];
+    unsigned char n[crypto_box_NONCEBYTES];
+    int parts = 0;
+
+    /* Determine the external flash address corresponding to the FW slot */
+    if (fw_slot > MAX_FW_SLOTS || fw_slot == 0) {
+        printf("[ota_slots] FW slot not valid, should be <= %d and > 0\n",
+               MAX_FW_SLOTS);
+        return -1;
+    }
+
+    /* Read the metadata of the corresponding FW slot */
+    fw_image_address = ota_slots_get_slot_address(fw_slot);
+
+    if (ota_slots_get_int_slot_metadata(fw_slot, &fw_metadata) == 0) {
+        ota_slots_print_metadata(&fw_metadata);
+    }
+    else {
+        printf("[ota_slots] ERROR cannot get slot metadata.\n");
+    }
+
+    printf("Verifying slot %d at 0x%lx \n", fw_slot, fw_image_address);
+
+    /* check magic number first */
+    if (OTA_FW_META_MAGIC != fw_metadata.magic) {
+        return -1;
+    }
+
+    /* check, if the HW_ID of the image is suitable */
+    uint64_t hw_id = HW_ID;
+    for (int i = 0; i < sizeof(fw_metadata.hw_id); i++) {
+        if ((uint8_t)(hw_id >> (i * 8)) != fw_metadata.hw_id[i]) {
+            return -1;
+        }
+    }
+
+    /*
+     * check the signature
+     */
+    /* calculate hash of metadata section and firmware binary */
+    address = fw_image_address + OTA_VTOR_ALIGN - OTA_FW_METADATA_SPACE;
+    parts = (fw_metadata.size + OTA_FW_METADATA_SPACE) / sizeof(firmware_buffer);
+    rest = (fw_metadata.size + OTA_FW_METADATA_SPACE) % sizeof(firmware_buffer);
+    sha256_init(&sha256_ctx);
+    while (parts) {
+        int_flash_read(firmware_buffer, address, sizeof(firmware_buffer));
+        sha256_update(&sha256_ctx, firmware_buffer, sizeof(firmware_buffer));
+        address += sizeof(firmware_buffer);
+        parts--;
+    }
+    int_flash_read(firmware_buffer, address, rest);
+    sha256_update(&sha256_ctx, firmware_buffer, rest);
+    sha256_final(&sha256_ctx, hash);
+
+    /* open the crypto_box to extract the signed hash and compare hash values */
+    uint8_t *fw_signature = (uint8_t *)ota_slots_get_fw_signature_addr(fw_slot);
+    memset(sign_hash, 0, sizeof(sign_hash));
+    memset(n, 0, sizeof(n));
+
+    int res = crypto_box_open(sign_hash, fw_signature, OTA_FW_SIGN_LEN, n, server_pkey, firmware_skey);
+    if (res) {
+        printf("Decryption failed.\n");
+        return -1;
+    }
+    else {
+        printf("Decryption successful! verifying...\n");
+        for (int i = 0; i < SHA256_DIGEST_LENGTH; i++) {
+            if (hash[i] != (sign_hash[i + crypto_box_ZEROBYTES])) {
+                printf("[ota_slots] ERROR incorrect decrypted hash!\n");
+                return -1;
+            }
+        }
+    }
+
+    printf("[ota_slots] FW slot %i successfully validated!\n", fw_slot);
+
+    return 0;
+}
+
+int ota_slots_get_int_slot_metadata(uint8_t fw_slot, OTA_FW_metadata_t *fw_slot_metadata)
+{
+    uint32_t slot_addr;
+
+    DEBUG("[ota_slots] Getting internal FW slot %d metadata\n", fw_slot);
+    if (fw_slot > MAX_FW_SLOTS || fw_slot == 0) {
+        printf("[ota_slots] FW slot not valid, should be <= %d and > 0\n",
+               MAX_FW_SLOTS);
+        return -1;
+    }
+
+    slot_addr = ota_slots_get_slot_address(fw_slot);
+
+    return ota_slots_get_int_metadata(slot_addr, fw_slot_metadata);
 }
 
 uint32_t ota_slots_get_slot_address(uint8_t fw_slot)
@@ -94,122 +243,7 @@ uint32_t ota_slots_get_slot_page(uint8_t fw_slot)
     return get_slot_page(fw_slot);
 }
 
-void ota_slots_print_metadata(FW_metadata_t *metadata)
-{
-    printf("Firmware Size: %ld\n", metadata->size);
-    printf("Firmware Version: %#x\n", metadata->version);
-    printf("Firmware UUID: %#lx\n", metadata->uuid);
-    printf("Firmware HASH: ");
-    for (unsigned long i = 0; i < sizeof(metadata->hash); i++) {
-        printf("%02x ", metadata->hash[i]);
-    }
-    printf("\n");
-    printf("Firmware signed HASH: ");
-    for (unsigned long i = 0; i < sizeof(metadata->shash); i++) {
-        printf("%02x ", metadata->shash[i]);
-    }
-    printf("\n");
-}
-
-int ota_slots_get_int_metadata(uint8_t fw_slot_page, FW_metadata_t *fw_metadata)
-{
-    uint32_t fw_address;
-
-#if !defined(FLASH_SECTORS)
-    fw_address = fw_slot_page * FLASHPAGE_SIZE + CPU_FLASH_BASE;
-#else
-    fw_address = (uint32_t)flashsector_addr(fw_slot_page);
-#endif
-
-    DEBUG("[ota_slots] Getting internal metadata on page %d at address %#lx\n",
-            fw_slot_page, fw_address);
-    int_flash_read((uint8_t*)fw_metadata, fw_address, sizeof(FW_metadata_t));
-
-    return 0;
-}
-
-int ota_slots_get_slot_metadata(uint8_t fw_slot, FW_metadata_t *fw_slot_metadata)
-{
-    /*
-     * TODO
-     */
-
-    return 0;
-}
-
-int ota_slots_get_int_slot_metadata(uint8_t fw_slot, FW_metadata_t *fw_slot_metadata)
-{
-    uint32_t page;
-
-    DEBUG("[ota_slots] Getting internal FW slot %d metadata\n", fw_slot);
-    if (fw_slot > MAX_FW_SLOTS || fw_slot == 0) {
-        printf("[ota_slots] FW slot not valid, should be <= %d and > 0\n",
-                MAX_FW_SLOTS);
-        return -1;
-    }
-
-    page = ota_slots_get_slot_page(fw_slot);
-
-    return ota_slots_get_int_metadata(page, fw_slot_metadata);
-}
-
-int ota_slots_verify_int_slot(uint8_t fw_slot)
-{
-    FW_metadata_t fw_metadata;
-    uint32_t fw_image_address;
-    uint32_t address;
-    uint16_t rest;
-    sha256_context_t sha256_ctx;
-    uint8_t hash[SHA256_DIGEST_LENGTH];
-    int parts = 0, i = 0;
-
-    /* Determine the external flash address corresponding to the FW slot */
-    if (fw_slot > MAX_FW_SLOTS || fw_slot == 0) {
-        printf("[ota_slots] FW slot not valid, should be <= %d and > 0\n",
-                MAX_FW_SLOTS);
-        return -1;
-    }
-
-    /* Read the metadata of the corresponding FW slot */
-    fw_image_address = ota_slots_get_slot_address(fw_slot);
-
-    if (ota_slots_get_int_slot_metadata(fw_slot, &fw_metadata) == 0) {
-        ota_slots_print_metadata(&fw_metadata);
-    } else {
-        printf("[ota_slots] ERROR cannot get slot metadata.\n");
-    }
-
-    printf("Verifying slot %d at 0x%lx \n", fw_slot, fw_image_address);
-
-    address = fw_image_address;
-    address += FW_METADATA_SPACE;
-    sha256_init(&sha256_ctx);
-
-    parts = fw_metadata.size / sizeof(firmware_buffer);
-    rest = fw_metadata.size % sizeof(firmware_buffer);
-
-    while (parts) {
-        int_flash_read(firmware_buffer, address, sizeof(firmware_buffer));
-        sha256_update(&sha256_ctx, firmware_buffer, sizeof(firmware_buffer));
-        address += sizeof(firmware_buffer);
-        parts--;
-    }
-
-    int_flash_read(firmware_buffer, address, rest);
-    sha256_update(&sha256_ctx, firmware_buffer, rest);
-    sha256_final(&sha256_ctx, hash);
-
-    for (i = 0; i < sizeof(hash); i++) {
-        if (hash[i] != fw_metadata.hash[i]) {
-            printf("[ota_slots] hash verification failed!\n");
-            return -1;
-        }
-    }
-
-    return 0;
-}
-
-int ota_slots_validate_metadata(FW_metadata_t *metadata)
+int ota_slots_validate_metadata(OTA_FW_metadata_t *metadata)
 {
     /* Is the FW slot erased?
      * First, we check to see if every byte in the metadata is 0xFF.
@@ -217,8 +251,8 @@ int ota_slots_validate_metadata(FW_metadata_t *metadata)
      * the FW slot to be empty.
      */
     int erased = 1;
-    uint8_t *metadata_ptr = (uint8_t*)metadata;
-    int b = FW_METADATA_LENGTH;
+    uint8_t *metadata_ptr = (uint8_t *)metadata;
+    int b = OTA_FW_METADATA_LENGTH;
 
     while (b--) {
         if (*metadata_ptr++ != 0xff) {
@@ -235,7 +269,12 @@ int ota_slots_validate_metadata(FW_metadata_t *metadata)
         return -1;
     }
 
-    /* If we get this far, all metadata bytes were cleared (0xff) */
+    /* The slot is not erased, check magic number */
+    if (OTA_FW_META_MAGIC != metadata->magic) {
+        return -1;
+    }
+
+    /* If we get this far, the metadata block seems to be valid / is not erased */
     return 0;
 }
 
@@ -247,10 +286,11 @@ int ota_slots_find_matching_int_slot(uint16_t version)
     for (int slot = 1; slot <= MAX_FW_SLOTS; slot++) {
 
         /* Get the metadata of the current FW slot. */
-        FW_metadata_t fw_slot_metadata;
-        if(ota_slots_get_int_slot_metadata(slot, &fw_slot_metadata) == 0) {
+        OTA_FW_metadata_t fw_slot_metadata;
+        if (ota_slots_get_int_slot_metadata(slot, &fw_slot_metadata) == 0) {
             ota_slots_print_metadata(&fw_slot_metadata);
-        } else {
+        }
+        else {
             printf("[ota_slots] ERROR cannot get slot metadata.\n");
         }
 
@@ -260,7 +300,7 @@ int ota_slots_find_matching_int_slot(uint16_t version)
         }
 
         /* Does this slot's FW version match our search parameter? */
-        if (fw_slot_metadata.version == version) {
+        if (fw_slot_metadata.fw_vers == version) {
             matching_slot = slot;
             break;
         }
@@ -268,9 +308,10 @@ int ota_slots_find_matching_int_slot(uint16_t version)
 
     if (matching_slot == -1) {
         printf("[ota_slots] No FW slot matches Firmware v%i\n", version);
-    } else {
+    }
+    else {
         printf("[ota_slots] FW slot #%i matches Firmware v%i\n", matching_slot,
-                version);
+               version);
     }
 
     return matching_slot;
@@ -282,11 +323,12 @@ int ota_slots_find_empty_int_slot(void)
     for (int slot = 1; slot <= MAX_FW_SLOTS; slot++) {
 
         /* Get the metadata of the current FW slot. */
-        FW_metadata_t fw_slot_metadata;
+        OTA_FW_metadata_t fw_slot_metadata;
 
-        if(ota_slots_get_int_slot_metadata(slot, &fw_slot_metadata) == 0) {
+        if (ota_slots_get_int_slot_metadata(slot, &fw_slot_metadata) == 0) {
             ota_slots_print_metadata(&fw_slot_metadata);
-        } else {
+        }
+        else {
             printf("[ota_slots] ERROR cannot get slot metadata.\n");
         }
 
@@ -297,7 +339,7 @@ int ota_slots_find_empty_int_slot(void)
     }
 
     printf("[ota_slots] Could not find any empty FW slots!"
-            "\nSearching for oldest FW slot...\n");
+           "\nSearching for oldest FW slot...\n");
     /*
      * If execution goes this far, no empty slot was found. Now, we look for
      * the oldest FW slot instead.
@@ -314,11 +356,12 @@ int ota_slots_find_oldest_int_image(void)
     /* Iterate through each of the MAX_FW_SLOTS internal slots. */
     for (int slot = 1; slot <= MAX_FW_SLOTS; slot++) {
         /* Get the metadata of the current FW slot. */
-        FW_metadata_t fw_slot_metadata;
+        OTA_FW_metadata_t fw_slot_metadata;
 
-        if(ota_slots_get_int_slot_metadata(slot, &fw_slot_metadata) == 0) {
+        if (ota_slots_get_int_slot_metadata(slot, &fw_slot_metadata) == 0) {
             ota_slots_print_metadata(&fw_slot_metadata);
-        } else {
+        }
+        else {
             printf("[ota_slots] ERROR cannot get slot metadata.\n");
         }
 
@@ -329,18 +372,19 @@ int ota_slots_find_oldest_int_image(void)
 
         /* Is this the oldest image we've found thus far? */
         if (oldest_firmware_version) {
-            if (fw_slot_metadata.version < oldest_firmware_version) {
+            if (fw_slot_metadata.fw_vers < oldest_firmware_version) {
                 oldest_fw_slot = slot;
-                oldest_firmware_version = fw_slot_metadata.version;
+                oldest_firmware_version = fw_slot_metadata.fw_vers;
             }
-        } else {
+        }
+        else {
             oldest_fw_slot = slot;
-            oldest_firmware_version = fw_slot_metadata.version;
+            oldest_firmware_version = fw_slot_metadata.fw_vers;
         }
     }
 
     printf("[ota_slots] Oldest FW slot: #%d; Firmware v%d\n", oldest_fw_slot,
-            oldest_firmware_version);
+           oldest_firmware_version);
 
     return oldest_fw_slot;
 }
@@ -352,13 +396,14 @@ int ota_slots_find_newest_int_image(void)
     uint16_t newest_firmware_version = 0;
 
     /* Iterate through each of the MAX_FW_SLOTS. */
-    for (int slot = 1; slot <= MAX_FW_SLOTS ; slot++) {
+    for (int slot = 1; slot <= MAX_FW_SLOTS; slot++) {
         /* Get the metadata of the current FW slot. */
-        FW_metadata_t fw_slot_metadata;
+        OTA_FW_metadata_t fw_slot_metadata;
 
-        if(ota_slots_get_int_slot_metadata(slot, &fw_slot_metadata) == 0) {
+        if (ota_slots_get_int_slot_metadata(slot, &fw_slot_metadata) == 0) {
             ota_slots_print_metadata(&fw_slot_metadata);
-        } else {
+        }
+        else {
             printf("[ota_slots] ERROR cannot get slot metadata.\n");
         }
 
@@ -367,19 +412,20 @@ int ota_slots_find_newest_int_image(void)
             continue;
         }
 
-        /* Is this the newest non-Golden Image image we've found thus far? */
-        if ( fw_slot_metadata.version > newest_firmware_version ) {
+        /* Is this the newest image we've found thus far? */
+        if (fw_slot_metadata.fw_vers > newest_firmware_version) {
             newest_fw_slot = slot;
-            newest_firmware_version = fw_slot_metadata.version;
+            newest_firmware_version = fw_slot_metadata.fw_vers;
         }
     }
 
     printf("Newest FW slot: #%d; Firmware v%d\n", newest_fw_slot,
-            newest_firmware_version);
+           newest_firmware_version);
 
     return newest_fw_slot;
 }
 
+// TODO_JB: test
 int ota_slots_erase_int_image(uint8_t fw_slot)
 {
     /* Get page address of the fw_slot in internal flash */
@@ -389,7 +435,7 @@ int ota_slots_erase_int_image(uint8_t fw_slot)
 
     if (fw_slot > MAX_FW_SLOTS || fw_slot == 0) {
         printf("[ota_slots] FW slot not valid, should be <= %d and > 0\n",
-                MAX_FW_SLOTS);
+               MAX_FW_SLOTS);
         return -1;
     }
 
@@ -397,12 +443,12 @@ int ota_slots_erase_int_image(uint8_t fw_slot)
 
 #if !defined(FLASH_SECTORS)
     printf("[ota_slots] Erasing FW slot %u [%#lx, %#lx]...\n", fw_slot,
-            fw_image_base_address,
-            fw_image_base_address + (FW_SLOT_PAGES * FLASHPAGE_SIZE) - 1);
+           fw_image_base_address,
+           fw_image_base_address + (FW_SLOT_PAGES * FLASHPAGE_SIZE) - 1);
 #else
     printf("[ota_slots] Erasing FW slot %u [%#lx, %#lx]...\n", fw_slot,
-            fw_image_base_address,
-            fw_image_base_address + get_slot_size(fw_slot) - 1);
+           fw_image_base_address,
+           fw_image_base_address + get_slot_size(fw_slot) - 1);
 #endif
 
     slot_page = ota_slots_get_slot_page(fw_slot);
@@ -427,22 +473,6 @@ int ota_slots_erase_int_image(uint8_t fw_slot)
     return 0;
 }
 
-int ota_slots_update_firmware(uint8_t fw_slot)
-{
-    /*
-     * TODO
-     */
-    return 0;
-}
-
-int ota_slots_store_fw_data( uint32_t ext_address, uint8_t *data, size_t data_length )
-{
-    /*
-     * TODO
-     */
-    return 0;
-}
-
 /*
  * _estack pointer needed to reset PSP position
  */
@@ -455,7 +485,7 @@ void ota_slots_jump_to_image(uint32_t destination_address)
          * Only add the metadata length offset if destination_address is NOT 0!
          * (Jumping to 0x0 is used to reboot the device)
          */
-        destination_address += FW_METADATA_SPACE;
+        destination_address += OTA_VTOR_ALIGN;
     }
 
     /* Disable IRQ */

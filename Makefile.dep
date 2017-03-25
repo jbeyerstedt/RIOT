@@ -629,6 +629,7 @@ ifneq (,$(filter ota_slots,$(USEMODULE)))
   endif
   FEATURES_REQUIRED += periph_slots
   USEMODULE += hashes
+  USEPKG += tweetnacl
 endif
 
 # include package dependencies

@@ -28,7 +28,7 @@ LINKER_SCRIPT = $(CPU_MODEL)_slot2.ld
 endif
 endif
 
-ifeq ($(OTA_SLOTS),1)
+ifeq ($(OTA_UPDATE),1)
 ifeq ($(FW_SLOT),1)
 LINKER_SCRIPT = $(CPU_MODEL)_slot1.ld
 endif

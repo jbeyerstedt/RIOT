@@ -19,13 +19,14 @@ OTA_FILE_SIGN_SPACE = 0x80      # reserved space for outer signature
 OTA_FILE_HEADER_SPACE = 0x100   # OTA_FW_METADATA_SPACE + OTA_FW_SIGN_SPACE + OTA_FILE_SIGN_SPACE
 OTA_VTOR_ALIGN = 0x200          # only for VTOR alignment
 
+# Define for which hardware id / article id this firmware should work
+HW_ID = 0xabc0123456789def
+
 # Define the parameters for the FW slot 1
 VERSION_IMG1 = 0x1
-HW_ID_IMG1 = 0xabcd12345678cdef
 
 # Define the parameters for the FW slot 2
 VERSION_IMG2 = 0x2
-HW_ID_IMG2 = 0xabcd12345678cdef
 
 ifdef SECTORS     # parameters for sectored flash
 	# Define the parameters for the FW slot 1
@@ -72,9 +73,12 @@ file-signer:
 	make clean all
 
 bootloader:
-	@cd ../bootloader; \
-	CFLAGS="-DFW_METADATA_SPACE=$(OTA_FW_METADATA_SPACE)" make -j clean all; \
-	cp bin/$(BOARD)/bootloader.hex ../ota_update
+	@cp keys.c ../ota_bootloader
+	@cd ../ota_bootloader; \
+	CFLAGS="-DOTA_FW_METADATA_SPACE=$(OTA_FW_METADATA_SPACE) -DHW_ID=$(HW_ID) \
+	-DOTA_FW_SIGN_SPACE=$(OTA_FW_SIGN_SPACE) -DOTA_VTOR_ALIGN=$(OTA_VTOR_ALIGN)" \
+	make -j clean all; \
+	cp bin/$(BOARD)/ota_bootloader.hex ../ota_update
 
 # only set FW_SLOTS as compiler flag to activate things in cpu.c and cpu_conf.h
 ota_update_app-slot1:
@@ -82,10 +86,10 @@ ota_update_app-slot1:
 	CFLAGS="-DFW_SLOT=1 -DVERSION=$(VERSION_IMG1) -DUUID=$(UUID_IMG1) \
 	-DFW_SLOTS=1 -DOTA_UPDATE=$(OTA_UPDATE)" OTA_UPDATE=$(OTA_UPDATE) \
 	OTA_FW_METADATA_SPACE=$(OTA_FW_METADATA_SPACE) FW_SLOT=1 \
-	OTA_HW_ID=$(HW_ID_IMG1) OTA_FW_VERS=$(VERSION_IMG1) \
+	OTA_HW_ID=$(HW_ID) OTA_FW_VERS=$(VERSION_IMG1) \
 	OTA_FW_BASE_ADDR=$(FW_IMAGE1_BASE) \
 	make -j clean all; \
-	cp bin/$(BOARD)/slot-binary-$(HW_ID_IMG1)-$(VERSION_IMG1).bin ../ota_update
+	cp bin/$(BOARD)/slot-binary-$(HW_ID)-$(VERSION_IMG1).bin ../ota_update
 
 # only set FW_SLOTS as compiler flag to activate things in cpu.c and cpu_conf.h
 ota_update_app-slot2:
@@ -93,46 +97,46 @@ ota_update_app-slot2:
 	CFLAGS="-DFW_SLOT=2 -DVERSION=$(VERSION_IMG2) -DUUID=$(UUID_IMG2) \
 	-DFW_SLOTS=1 -DOTA_UPDATE=$(OTA_UPDATE)" OTA_UPDATE=$(OTA_UPDATE) \
 	OTA_FW_METADATA_SPACE=$(OTA_FW_METADATA_SPACE) FW_SLOT=2 \
-	OTA_HW_ID=$(HW_ID_IMG2) OTA_FW_VERS=$(VERSION_IMG2) \
+	OTA_HW_ID=$(HW_ID) OTA_FW_VERS=$(VERSION_IMG2) \
 	OTA_FW_BASE_ADDR=$(FW_IMAGE2_BASE) \
 	make -j clean all; \
-	cp bin/$(BOARD)/slot-binary-$(HW_ID_IMG2)-$(VERSION_IMG2).bin ../ota_update
+	cp bin/$(BOARD)/slot-binary-$(HW_ID)-$(VERSION_IMG2).bin ../ota_update
 
 sign_binary-slot1:
 	../../dist/tools/ota_update_filesign/bin/./generate-ota_flash_image \
-	slot-binary-$(HW_ID_IMG1)-$(VERSION_IMG1).bin \
+	slot-binary-$(HW_ID)-$(VERSION_IMG1).bin \
 	server_skey firmware_pkey.pub; \
-	mv ota_flash_image.bin slot-image-$(HW_ID_IMG1)-$(VERSION_IMG1).bin
+	mv ota_flash_image.bin slot-image-$(HW_ID)-$(VERSION_IMG1).bin
 
 sign_binary-slot2:
 	../../dist/tools/ota_update_filesign/bin/./generate-ota_flash_image \
-	slot-binary-$(HW_ID_IMG2)-$(VERSION_IMG2).bin \
+	slot-binary-$(HW_ID)-$(VERSION_IMG2).bin \
 	server_skey firmware_pkey.pub; \
-	mv ota_flash_image.bin slot-image-$(HW_ID_IMG2)-$(VERSION_IMG2).bin
+	mv ota_flash_image.bin slot-image-$(HW_ID)-$(VERSION_IMG2).bin
 
 sign-update-files:
 	../../dist/tools/ota_update_filesign/bin/./generate-ota_update_file \
-	slot-binary-$(HW_ID_IMG1)-$(VERSION_IMG1).bin \
+	slot-binary-$(HW_ID)-$(VERSION_IMG1).bin \
 	server_skey firmware_pkey.pub; \
-	mv ota_update_file.bin fw_update-$(HW_ID_IMG1)-$(VERSION_IMG1).bin; \
+	mv ota_update_file.bin fw_update-$(HW_ID)-$(VERSION_IMG1).bin; \
 	rm tmp_file; \
 	../../dist/tools/ota_update_filesign/bin/./generate-ota_update_file \
-	slot-binary-$(HW_ID_IMG2)-$(VERSION_IMG2).bin \
+	slot-binary-$(HW_ID)-$(VERSION_IMG2).bin \
 	server_skey firmware_pkey.pub; \
-	mv ota_update_file.bin fw_update-$(HW_ID_IMG2)-$(VERSION_IMG2).bin; \
+	mv ota_update_file.bin fw_update-$(HW_ID)-$(VERSION_IMG2).bin; \
 	rm tmp_file;
 
 merge-binary: sign_binary-slot1 sign_binary-slot2
-	srec_cat bootloader.hex -intel -crop 0x08000000 $(FW_IMAGE1_OFFSET) \
-	slot-image-$(HW_ID_IMG1)-$(VERSION_IMG1).bin -binary -offset $(FW_IMAGE1_OFFSET) \
+	srec_cat ota_bootloader.hex -intel -crop 0x08000000 $(FW_IMAGE1_OFFSET) \
+	slot-image-$(HW_ID)-$(VERSION_IMG1).bin -binary -offset $(FW_IMAGE1_OFFSET) \
 	-crop $(FW_IMAGE1_OFFSET) $(FW_IMAGE1_END) \
-	slot-image-$(HW_ID_IMG2)-$(VERSION_IMG2).bin -binary -offset $(FW_IMAGE2_OFFSET) \
+	slot-image-$(HW_ID)-$(VERSION_IMG2).bin -binary -offset $(FW_IMAGE2_OFFSET) \
 	-crop $(FW_IMAGE2_OFFSET) $(FW_IMAGE2_END) \
 	-o firmware-slots.hex -intel
 
 merge-factory-binary: sign_binary-slot1
-	srec_cat bootloader.hex -intel -crop 0x08000000 $(FW_IMAGE1_OFFSET) \
-	slot-image-$(HW_ID_IMG1)-$(VERSION_IMG1).bin -binary -offset $(FW_IMAGE1_OFFSET) \
+	srec_cat ota_bootloader.hex -intel -crop 0x08000000 $(FW_IMAGE1_OFFSET) \
+	slot-image-$(HW_ID)-$(VERSION_IMG1).bin -binary -offset $(FW_IMAGE1_OFFSET) \
 	-crop $(FW_IMAGE1_OFFSET) $(FW_IMAGE1_END) \
 	-o factory-firmware.hex -intel
 

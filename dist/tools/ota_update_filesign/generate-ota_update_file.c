@@ -49,18 +49,6 @@
 #include "tweetnacl/tweetnacl.h"
 #include "hashes/sha256.h"
 
-#ifndef OTA_FW_METADATA_SPACE
-#define OTA_FW_METADATA_SPACE       (0x040)     /* default value only */
-#endif
-
-#ifndef OTA_FW_SIGN_SPACE
-#define OTA_FW_SIGN_SPACE           (0x040)     /* default value only */
-#endif
-
-#ifndef OTA_FILE_SIGN_SPACE
-#define OTA_FILE_SIGN_SPACE         (0x080)     /* default value only */
-#endif
-
 /* Input unsigned slot binary .bin file */
 FILE *slot_bin;
 
@@ -136,7 +124,7 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    printf("Reading server secret key \"server_skey\"...\n");
+    printf("Reading server secret key...\n");
     server_sk = fopen(argv[2], "r");
     if (server_sk != NULL) {
         size_t size = fread(server_skey, 1, sizeof(server_skey), server_sk);
@@ -174,7 +162,8 @@ int main(int argc, char *argv[])
      *  generate firmware signature (inner signature)
      */
 
-    /* read the image file and calculate hash */
+    /* read the image file (metadata + binary) and calculate hash */
+    fseek(slot_bin, 0, SEEK_SET);
     sha256_init(&firmware_sha256);
     while ((bytes_read = fread(firmware_buffer, 1, sizeof(firmware_buffer), slot_bin))) {
         sha256_update(&firmware_sha256, firmware_buffer, bytes_read);
@@ -195,9 +184,9 @@ int main(int argc, char *argv[])
     /* Open the output firmware .bin file */
     updatefile_bin = fopen("ota_flash_image.bin", "w+");
 
-    /* generate spaceing for correct VTOR alignment */
+    /* generate spacing for correct VTOR alignment */
     uint8_t spacing_buffer[OTA_VTOR_ALIGN - (OTA_FW_METADATA_SPACE + OTA_FW_SIGN_SPACE)];
-    for (unsigned long b = 0; i < sizeof(spacing_buffer); i++) {
+    for (unsigned long b = 0; b < sizeof(spacing_buffer); b++) {
         spacing_buffer[b] = 0xff;
     }
     fwrite(spacing_buffer, sizeof(spacing_buffer), 1, updatefile_bin);

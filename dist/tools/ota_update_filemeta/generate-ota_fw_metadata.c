@@ -48,10 +48,6 @@
 #include "ota_slots.h"
 #include "hashes/sha256.h"
 
-#ifndef OTA_FW_METADATA_SPACE
-#define OTA_FW_METADATA_SPACE       (0x040)     /* default value only */
-#endif
-
 /* Input firmware .bin file */
 FILE *firmware_bin;
 
@@ -94,7 +90,7 @@ int main(int argc, char *argv[])
     fclose(firmware_bin);
 
     /* Generate FW image metadata */
-    metadata.magic = 0x544f4952;        /* RIOT as hex */
+    metadata.magic = OTA_FW_META_MAGIC;
     sscanf(argv[3], "%lx", (uint64_t *)&(metadata.hw_id));
     for (int i = 0; i < 16; i++) {      /* set chip id to 0 */
         metadata.chip_id[i] = 0x00U;
