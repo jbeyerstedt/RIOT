@@ -95,6 +95,7 @@ int main(int argc, char *argv[])
     uint8_t sha256_hash[SHA256_DIGEST_LENGTH];
 
     uint8_t fw_signature[OTA_FW_SIGN_LEN];
+
 #ifndef IMAGE_ONLY
     uint8_t file_signature[OTA_FILE_SIGN_LEN];
 #endif
@@ -129,7 +130,8 @@ int main(int argc, char *argv[])
         size_t size = fread(firmware_pkey, 1, sizeof(firmware_pkey), firmware_pk);
         printf("Read %zu bytes from firmware_pkey.pub\n", size);
         fclose(firmware_pk);
-    } else {
+    }
+    else {
         printf("ERROR! Cannot open firmware public key\n");
         return -1;
     }
@@ -140,7 +142,8 @@ int main(int argc, char *argv[])
         size_t size = fread(server_skey, 1, sizeof(server_skey), server_sk);
         printf("Read %zu bytes from server_skey\n", size);
         fclose(server_sk);
-    } else {
+    }
+    else {
         printf("ERROR! Cannot open server secret key\n");
         return -1;
     }
@@ -173,7 +176,7 @@ int main(int argc, char *argv[])
 
     /* read the image file and calculate hash */
     sha256_init(&firmware_sha256);
-    while((bytes_read = fread(firmware_buffer, 1, sizeof(firmware_buffer), slot_bin))) {
+    while ((bytes_read = fread(firmware_buffer, 1, sizeof(firmware_buffer), slot_bin))) {
         sha256_update(&firmware_sha256, firmware_buffer, bytes_read);
     }
     sha256_final(&firmware_sha256, sha256_hash);
@@ -192,6 +195,13 @@ int main(int argc, char *argv[])
     /* Open the output firmware .bin file */
     updatefile_bin = fopen("ota_flash_image.bin", "w+");
 
+    /* generate spaceing for correct VTOR alignment */
+    uint8_t spacing_buffer[OTA_VTOR_ALIGN - (OTA_FW_METADATA_SPACE + OTA_FW_SIGN_SPACE)];
+    for (unsigned long b = 0; i < sizeof(spacing_buffer); i++) {
+        spacing_buffer[b] = 0xff;
+    }
+    fwrite(spacing_buffer, sizeof(spacing_buffer), 1, updatefile_bin);
+
     /* save the signature first */
     fwrite(fw_signature, sizeof(fw_signature), 1, updatefile_bin);
 
@@ -205,7 +215,7 @@ int main(int argc, char *argv[])
 
     /* then copy the binary to the output file */
     fseek(slot_bin, 0, SEEK_SET);
-    while((bytes_read = fread(firmware_buffer, 1, sizeof(firmware_buffer), slot_bin))) {
+    while ((bytes_read = fread(firmware_buffer, 1, sizeof(firmware_buffer), slot_bin))) {
         fwrite(firmware_buffer, bytes_read, 1, updatefile_bin);
     }
 
@@ -232,7 +242,7 @@ int main(int argc, char *argv[])
 #endif /* (OTA_FW_SIGN_SPACE > OTA_FW_SIGN_LEN) */
 
     uint8_t output_buffer[sizeof(OTA_FW_metadata_t)];
-    memcpy(output_buffer, (uint8_t*)&metadata, sizeof(OTA_FW_metadata_t));
+    memcpy(output_buffer, (uint8_t *)&metadata, sizeof(OTA_FW_metadata_t));
     fwrite(output_buffer, sizeof(output_buffer), 1, tmp_file);
     for (unsigned long b = 0; b < (OTA_FW_METADATA_SPACE - sizeof(metadata)); b++) {
         blank_buffer[b] = 0xff;
@@ -245,7 +255,7 @@ int main(int argc, char *argv[])
     // TODO_JB: generate random nonce for crypto_stream encryption!
 
     fseek(slot_bin, OTA_FW_METADATA_SPACE, SEEK_SET);
-    while((bytes_read = fread(firmware_buffer, 1, sizeof(firmware_buffer), slot_bin))) {
+    while ((bytes_read = fread(firmware_buffer, 1, sizeof(firmware_buffer), slot_bin))) {
         // TODO_JB: use crypto_stream, write to tmp_file
 
         fwrite(firmware_buffer, bytes_read, 1, tmp_file); // TODO_JB: dummy only
@@ -258,7 +268,7 @@ int main(int argc, char *argv[])
     /* calculate hash of encrypted binary, the metadata and the firmware signature (temp file) */
     fseek(tmp_file, 0, SEEK_SET);
     sha256_init(&firmware_sha256);
-    while((bytes_read = fread(firmware_buffer, 1, sizeof(firmware_buffer), tmp_file))) {
+    while ((bytes_read = fread(firmware_buffer, 1, sizeof(firmware_buffer), tmp_file))) {
         sha256_update(&firmware_sha256, firmware_buffer, bytes_read);
     }
     sha256_final(&firmware_sha256, sha256_hash);
@@ -286,7 +296,7 @@ int main(int argc, char *argv[])
 
     /* then copy the temp file to the output file */
     fseek(tmp_file, 0, SEEK_SET);
-    while((bytes_read = fread(firmware_buffer, 1, sizeof(firmware_buffer), tmp_file))) {
+    while ((bytes_read = fread(firmware_buffer, 1, sizeof(firmware_buffer), tmp_file))) {
         fwrite(firmware_buffer, bytes_read, 1, updatefile_bin);
     }
 

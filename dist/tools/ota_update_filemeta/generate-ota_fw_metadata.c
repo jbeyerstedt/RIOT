@@ -118,7 +118,7 @@ int main(int argc, char *argv[])
     printf("Firmware Size: %d Byte (0x%02x)\n", metadata.size, metadata.size);
 
 
-    memcpy(output_buffer, (uint8_t*)&metadata, sizeof(OTA_FW_metadata_t));
+    memcpy(output_buffer, (uint8_t *)&metadata, sizeof(OTA_FW_metadata_t));
 
     /* Open the output firmware .bin file */
     metadata_bin = fopen("ota_fw_metadata.bin", "w");
