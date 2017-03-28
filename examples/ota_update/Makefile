@@ -12,6 +12,8 @@ SECTORS = 1
 # Activate OTA FW Updates in the Makefiles
 OTA_UPDATE = 1
 
+# set FW_SLOTS only as a compiler flag to activate things in cpu.c and cpu_conf.h
+
 OTA_FW_METADATA_SPACE = 0x40    # reserved space for metadata
 OTA_FW_SIGN_SPACE = 0x40        # reserved space for inner signature
 OTA_FW_HEADER_SPACE = 0x80      # OTA_FW_METADATA_SPACE + OTA_FW_SIGN_SPACE
@@ -22,11 +24,10 @@ OTA_VTOR_ALIGN = 0x200          # only for VTOR alignment
 # Define for which hardware id / article id this firmware should work
 HW_ID = 0xabc0123456789def
 
-# Define the parameters for the FW slot 1
-VERSION_IMG1 = 0x1
-
-# Define the parameters for the FW slot 2
-VERSION_IMG2 = 0x2
+# Define the version number (must be strictly ascending) of this firmware
+FW_VERS = 0x1
+# FW_VERS_2 is used for manual/ testing population of both slots only
+FW_VERS_2 = 0x2
 
 ifdef SECTORS     # parameters for sectored flash
 	# Define the parameters for the FW slot 1
@@ -37,7 +38,7 @@ ifdef SECTORS     # parameters for sectored flash
 
 	# Define the parameters for the FW slot 2
 	FW_IMAGE2_OFFSET = 0x08020000   # start after image 1
-	FW_IMAGE2_LENGTH = 0x20000      # Reserve a few sectors
+	FW_IMAGE2_LENGTH = 0x20000      # Reserve sectors 5
 	FW_IMAGE2_END = 0x08040000      # FW_IMAGE_OFFSET + FW_IMAGE_LENGTH
 	FW_IMAGE2_BASE = 0x08020200     # FW_IMAGE2_OFFSET + OTA_VTOR_ALIGN
 else              # parameters for paged flash
@@ -52,26 +53,54 @@ else              # parameters for paged flash
 	FW_IMAGE2_END = 0x08080000      # FW_IMAGE_OFFSET + FW_IMAGE_LENGTH
 endif
 
-generate-keys:
-	$(RIOTBASE)/dist/tools/nacl_key_generator/bin/./generate-nacl-keys
+OTA_FILE_OFFSET = 0x08060000        # starte at sector 7
+OTA_FILE_LENGTH = 0x20000           # Reserve whole sector 7
 
-setup-tools: file-metagen file-signer key-generator
+### TARGETS TO INITIALIZE ALL TOOLS ###
+# compile all necessary tools (dist/tools)
+setup-tools: make-keygen make-metagen make-filesign
 	@true
 
-key-generator:
+# call this one time, if you want to generate new keys for a new device
+setup-keys:
+	$(RIOTBASE)/dist/tools/nacl_key_generator/bin/./generate-nacl-keys
+
+make-keygen:
 	@cd ../../dist/tools/nacl_key_generator; \
 	make clean all
 
-file-metagen:
+make-metagen:
 	@cd ../../dist/tools/ota_update_filemeta; \
 	CFLAGS="-DOTA_FW_METADATA_SPACE=$(OTA_FW_METADATA_SPACE)" make clean all
 
-file-signer:
+make-filesign:
 	@cd ../../dist/tools/ota_update_filesign; \
 	CFLAGS="-DOTA_FW_METADATA_SPACE=$(OTA_FW_METADATA_SPACE) \
 	-DOTA_FW_SIGN_SPACE=$(OTA_FW_SIGN_SPACE) -DOTA_FILE_SIGN_SPACE=$(OTA_FILE_SIGN_SPACE)" \
 	make clean all
 
+### TARGETS TO CREATE UPDATE FILES ###
+# this does all steps needed to have both update files ready to sign
+updatefiles-prepare: ota_update_app-file-slot1 ota_update_app-file-slot2
+	@true
+
+# this does all steps needed to have both update files ready to distribute
+updatefiles-ready: updatefiles-prepare sign-updatefiles
+	@true
+
+sign-updatefiles:
+	../../dist/tools/ota_update_filesign/bin/./generate-ota_update_file \
+	app_binary-$(HW_ID)-$(FW_VERS)-s1.bin \
+	server_skey firmware_pkey.pub; \
+	mv ota_update_file.bin fw_update-$(HW_ID)-$(FW_VERS)-s1.bin; \
+	rm tmp_file
+	../../dist/tools/ota_update_filesign/bin/./generate-ota_update_file \
+	app_binary-$(HW_ID)-$(FW_VERS)-s2.bin \
+	server_skey firmware_pkey.pub; \
+	mv ota_update_file.bin fw_update-$(HW_ID)-$(FW_VERS)-s2.bin; \
+	rm tmp_file;
+
+### TARGETS FOR COMPILING THE APPLICATIONS SEPERATELY ###
 bootloader:
 	@cp keys.c ../ota_bootloader
 	@cd ../ota_bootloader; \
@@ -80,84 +109,111 @@ bootloader:
 	make -j clean all; \
 	cp bin/$(BOARD)/ota_bootloader.hex ../ota_update
 
-# only set FW_SLOTS as compiler flag to activate things in cpu.c and cpu_conf.h
-ota_update_app-slot1:
+# compile application for manual testing
+ota_update_app-test-slot1:
 	@cd ../ota_update_app; \
-	CFLAGS="-DFW_SLOT=1 -DVERSION=$(VERSION_IMG1) -DUUID=$(UUID_IMG1) \
-	-DFW_SLOTS=1 -DOTA_UPDATE=$(OTA_UPDATE)" OTA_UPDATE=$(OTA_UPDATE) \
-	OTA_FW_METADATA_SPACE=$(OTA_FW_METADATA_SPACE) FW_SLOT=1 \
-	OTA_HW_ID=$(HW_ID) OTA_FW_VERS=$(VERSION_IMG1) \
+	CFLAGS="-DFW_SLOT=1 -DOTA_HW_ID=$(OTA_HW_ID) -DOTA_FW_VERS=$(FW_VERS) \
+	-DFW_SLOTS=1 -DOTA_UPDATE=$(OTA_UPDATE) -DOTA_VTOR_ALIGN=$(OTA_VTOR_ALIGN)" \
+	FW_SLOT=1 OTA_HW_ID=$(HW_ID) OTA_FW_VERS=$(FW_VERS) \
+	OTA_UPDATE=$(OTA_UPDATE) OTA_FW_METADATA_SPACE=$(OTA_FW_METADATA_SPACE) \
 	OTA_FW_BASE_ADDR=$(FW_IMAGE1_BASE) \
 	make -j clean all; \
-	cp bin/$(BOARD)/slot-binary-$(HW_ID)-$(VERSION_IMG1).bin ../ota_update
+	cp bin/$(BOARD)/app_binary-$(HW_ID)-$(FW_VERS)-s1.bin ../ota_update
 
-# only set FW_SLOTS as compiler flag to activate things in cpu.c and cpu_conf.h
-ota_update_app-slot2:
+# compile application for update file
+ota_update_app-file-slot1: ota_update_app-test-slot1
+	@true
+
+# compile application for manual testing (use FW_VERS_2)
+ota_update_app-test-slot2:
 	@cd ../ota_update_app; \
-	CFLAGS="-DFW_SLOT=2 -DVERSION=$(VERSION_IMG2) -DUUID=$(UUID_IMG2) \
-	-DFW_SLOTS=1 -DOTA_UPDATE=$(OTA_UPDATE)" OTA_UPDATE=$(OTA_UPDATE) \
-	OTA_FW_METADATA_SPACE=$(OTA_FW_METADATA_SPACE) FW_SLOT=2 \
-	OTA_HW_ID=$(HW_ID) OTA_FW_VERS=$(VERSION_IMG2) \
+	CFLAGS="-DFW_SLOT=2 -DOTA_HW_ID=$(OTA_HW_ID) -DOTA_FW_VERS=$(FW_VERS_2) \
+	-DFW_SLOTS=1 -DOTA_UPDATE=$(OTA_UPDATE) -DOTA_VTOR_ALIGN=$(OTA_VTOR_ALIGN)" \
+	FW_SLOT=2 OTA_HW_ID=$(HW_ID) OTA_FW_VERS=$(FW_VERS_2) \
+	OTA_UPDATE=$(OTA_UPDATE) OTA_FW_METADATA_SPACE=$(OTA_FW_METADATA_SPACE) \
 	OTA_FW_BASE_ADDR=$(FW_IMAGE2_BASE) \
 	make -j clean all; \
-	cp bin/$(BOARD)/slot-binary-$(HW_ID)-$(VERSION_IMG2).bin ../ota_update
+	cp bin/$(BOARD)/app_binary-$(HW_ID)-$(FW_VERS_2)-s2.bin ../ota_update
 
-sign_binary-slot1:
-	../../dist/tools/ota_update_filesign/bin/./generate-ota_flash_image \
-	slot-binary-$(HW_ID)-$(VERSION_IMG1).bin \
-	server_skey firmware_pkey.pub; \
-	mv ota_flash_image.bin slot-image-$(HW_ID)-$(VERSION_IMG1).bin
+# compile application for update file (use FW_VERS)
+ota_update_app-file-slot2:
+	@cd ../ota_update_app; \
+	CFLAGS="-DFW_SLOT=2 -DOTA_HW_ID=$(OTA_HW_ID) -DOTA_FW_VERS=$(FW_VERS) \
+	-DFW_SLOTS=1 -DOTA_UPDATE=$(OTA_UPDATE) -DOTA_VTOR_ALIGN=$(OTA_VTOR_ALIGN)" \
+	FW_SLOT=2 OTA_HW_ID=$(HW_ID) OTA_FW_VERS=$(FW_VERS) \
+	OTA_UPDATE=$(OTA_UPDATE) OTA_FW_METADATA_SPACE=$(OTA_FW_METADATA_SPACE) \
+	OTA_FW_BASE_ADDR=$(FW_IMAGE2_BASE) \
+	make -j clean all; \
+	cp bin/$(BOARD)/app_binary-$(HW_ID)-$(FW_VERS)-s2.bin ../ota_update
 
-sign_binary-slot2:
-	../../dist/tools/ota_update_filesign/bin/./generate-ota_flash_image \
-	slot-binary-$(HW_ID)-$(VERSION_IMG2).bin \
-	server_skey firmware_pkey.pub; \
-	mv ota_flash_image.bin slot-image-$(HW_ID)-$(VERSION_IMG2).bin
+### TARGETS WITH ALL IN ONE SERVICE ###
+# this does all steps needed to populate both slots (ready to flash)
+test-hex: bootloader ota_update_app-test-slot1 ota_update_app-test-slot2 merge-test-hex
+	@true
 
-sign-update-files:
-	../../dist/tools/ota_update_filesign/bin/./generate-ota_update_file \
-	slot-binary-$(HW_ID)-$(VERSION_IMG1).bin \
-	server_skey firmware_pkey.pub; \
-	mv ota_update_file.bin fw_update-$(HW_ID)-$(VERSION_IMG1).bin; \
-	rm tmp_file; \
-	../../dist/tools/ota_update_filesign/bin/./generate-ota_update_file \
-	slot-binary-$(HW_ID)-$(VERSION_IMG2).bin \
-	server_skey firmware_pkey.pub; \
-	mv ota_update_file.bin fw_update-$(HW_ID)-$(VERSION_IMG2).bin; \
-	rm tmp_file;
+# this does all steps needed to populate both slots (ready to flash)
+factory-hex: bootloader ota_update_app-test-slot1 merge-factory-hex
+	@true
 
-merge-binary: sign_binary-slot1 sign_binary-slot2
+merge-test-hex: sign-image-slot1 sign-image-slot2
 	srec_cat ota_bootloader.hex -intel -crop 0x08000000 $(FW_IMAGE1_OFFSET) \
-	slot-image-$(HW_ID)-$(VERSION_IMG1).bin -binary -offset $(FW_IMAGE1_OFFSET) \
+	fw_image-$(HW_ID)-$(FW_VERS)-s1.bin -binary -offset $(FW_IMAGE1_OFFSET) \
 	-crop $(FW_IMAGE1_OFFSET) $(FW_IMAGE1_END) \
-	slot-image-$(HW_ID)-$(VERSION_IMG2).bin -binary -offset $(FW_IMAGE2_OFFSET) \
+	fw_image-$(HW_ID)-$(FW_VERS_2)-s2.bin -binary -offset $(FW_IMAGE2_OFFSET) \
 	-crop $(FW_IMAGE2_OFFSET) $(FW_IMAGE2_END) \
-	-o firmware-slots.hex -intel
+	-o hex-slotstest.hex -intel
 
-merge-factory-binary: sign_binary-slot1
+merge-factory-hex: sign-image-slot1
 	srec_cat ota_bootloader.hex -intel -crop 0x08000000 $(FW_IMAGE1_OFFSET) \
-	slot-image-$(HW_ID)-$(VERSION_IMG1).bin -binary -offset $(FW_IMAGE1_OFFSET) \
+	fw_image-$(HW_ID)-$(FW_VERS)-s1.bin -binary -offset $(FW_IMAGE1_OFFSET) \
 	-crop $(FW_IMAGE1_OFFSET) $(FW_IMAGE1_END) \
-	-o factory-firmware.hex -intel
+	-o hex-factory.hex -intel
 
-master-hex: bootloader ota_update_app-slot1 ota_update_app-slot2 merge-binary
-	@true
+sign-image-slot1:
+	../../dist/tools/ota_update_filesign/bin/./generate-ota_flash_image \
+	app_binary-$(HW_ID)-$(FW_VERS)-s1.bin \
+	server_skey firmware_pkey.pub; \
+	mv ota_flash_image.bin fw_image-$(HW_ID)-$(FW_VERS)-s1.bin
 
-factory-hex: bootloader ota_update_app-slot1 merge-factory-binary
-	@true
+sign-image-slot2:
+	../../dist/tools/ota_update_filesign/bin/./generate-ota_flash_image \
+	app_binary-$(HW_ID)-$(FW_VERS_2)-s2.bin \
+	server_skey firmware_pkey.pub; \
+	mv ota_flash_image.bin fw_image-$(HW_ID)-$(FW_VERS_2)-s2.bin
 
-update-files: ota_update_app-slot1 ota_update_app-slot2 sign-update-files
-	@true
+### TARGETS TO FLASH THE DEVICE ###
+# flashes the master-hex
+flash-test:
+	OPENOCD_CONFIG=../../boards/$(BOARD)/dist/openocd.cfg \
+	HEXFILE=hex-slotstest.hex \
+	../../dist/tools/openocd/openocd.sh flash
 
+# flashes the factory-hex
+flash-factory:
+	OPENOCD_CONFIG=../../boards/$(BOARD)/dist/openocd.cfg \
+	HEXFILE=hex-factory.hex \
+	../../dist/tools/openocd/openocd.sh flash
+
+# flashes the update file for slot 1 in the OTA file space
+flash-updatefile-slot1:
+	srec_cat fw_update-$(HW_ID)-$(FW_VERS)-s1.bin -binary -offset $(OTA_FILE_OFFSET) \
+	-o hex-updatefile-s1.hex -intel
+	OPENOCD_CONFIG=../../boards/$(BOARD)/dist/openocd.cfg \
+	HEXFILE=hex-updatefile-s1.hex \
+	../../dist/tools/openocd/openocd.sh flash
+
+# flashes the update file for slot 2 in the OTA file space
+flash-updatefile-slot2:
+	srec_cat fw_update-$(HW_ID)-$(FW_VERS)-s2.bin -binary -offset $(OTA_FILE_OFFSET) \
+	-o hex-updatefile-s2.hex -intel
+	OPENOCD_CONFIG=../../boards/$(BOARD)/dist/openocd.cfg \
+	HEXFILE=hex-updatefile-s2.hex \
+	../../dist/tools/openocd/openocd.sh flash
+
+# cleans everything, but leaves the keys
 clean:
-	@rm *.hex *.bin firmware_skey* server_skey* keys.c *.pub
+	@rm *.hex *.bin
 
-flash:
-	OPENOCD_CONFIG=../../boards/$(BOARD)/dist/openocd.cfg \
-	HEXFILE=firmware-slots.hex \
-	../../dist/tools/openocd/openocd.sh flash
-
-factory-flash:
-	OPENOCD_CONFIG=../../boards/$(BOARD)/dist/openocd.cfg \
-	HEXFILE=factory-firmware.hex \
-	../../dist/tools/openocd/openocd.sh flash
+# cleans everything
+clean-all: clean
+	@rm firmware_skey* server_skey* *.pub keys.c

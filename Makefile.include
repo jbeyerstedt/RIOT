@@ -303,7 +303,7 @@ ifeq ($(OTA_UPDATE),1)
 	$(STRIP) --strip-unneeded --strip-debug $(ELFFILE)
 	$(OBJCOPY) -O binary $(ELFFILE) $(BINFILE)
 	$(OTA_METADATA)/bin/./generate-ota_fw_metadata $(BINFILE) $(OTA_FW_VERS) $(OTA_HW_ID) $(OTA_FW_BASE_ADDR)
-	srec_cat $(BINFILE) -binary -offset $(OTA_FW_METADATA_SPACE) ota_fw_metadata.bin -binary -o $(BINDIR)/slot-binary-$(OTA_HW_ID)-$(OTA_FW_VERS).bin -binary
+	srec_cat $(BINFILE) -binary -offset $(OTA_FW_METADATA_SPACE) ota_fw_metadata.bin -binary -o $(BINDIR)/app_binary-$(OTA_HW_ID)-$(OTA_FW_VERS)-s$(FW_SLOT).bin -binary
 endif
 	$(Q)$(SIZE) $(ELFFILE)
 	$(Q)$(OBJCOPY) $(OFLAGS) $(ELFFILE) $(HEXFILE)

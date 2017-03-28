@@ -85,12 +85,23 @@ extern "C" {
  * @{
  */
 
+#ifdef OTA_VTOR_ALIGN
+#define FW_METADATA_SPACE           OTA_VTOR_ALIGN  /* to remain compatibility */
+#endif
+
 #ifndef FW_METADATA_SPACE
-#define FW_METADATA_SPACE           (0x200)
+#define FW_METADATA_SPACE           (0x200) /* default value only */
 #endif
 
 #define MAX_FW_SLOTS                (2)
 #define BOOTLOADER_SPACE            (0x4000)
+
+#ifdef OTA_UPDATE
+#define OTA_FILE_SLOT               FLASH_BASE + 0x60000
+#define OTA_FILE_SLOT_START_SECTOR  (7)
+#define OTA_FILE_SLOT_SIZE          (0x20000)
+#define OTA_FILE_SLOT_END           OTA_FILE_SLOT + OTA_FILE_SLOT_SIZE
+#endif /* OTA_UPDATE */
 
 #if !defined(FLASH_SECTORS)         /* defined by Makefile.include of the CPU */
 #define FW_SLOT_PAGES               (120)
@@ -124,7 +135,6 @@ extern "C" {
     #define CURRENT_FIRMWARE_PAGE       FW_SLOT_2_PAGE
     #define CURRENT_FIRMWARE_END        FW_SLOT_2_END
     #endif
-
 #endif /* FW_SLOTS */
 
 /** @} */
