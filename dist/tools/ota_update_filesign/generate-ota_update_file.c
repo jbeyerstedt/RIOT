@@ -275,6 +275,11 @@ int main(int argc, char *argv[])
     /* Open the output firmware .bin file */
     updatefile_bin = fopen("ota_update_file.bin", "w+");
 
+    uint32_t magic = OTA_FW_FILE_MAGIC_H;
+    fwrite(&magic, sizeof(magic), 1, updatefile_bin);
+    magic = OTA_FW_FILE_MAGIC_L;
+    fwrite(&magic, sizeof(magic), 1, updatefile_bin);
+
     fwrite(file_signature, sizeof(file_signature), 1, updatefile_bin);
 #if (OTA_FILE_SIGN_SPACE > OTA_FILE_SIGN_LEN)
     for (unsigned long b = 0; b < (OTA_FILE_SIGN_SPACE - sizeof(file_signature)); b++) {
