@@ -295,7 +295,7 @@ int ota_slots_find_matching_int_slot(uint16_t version)
         }
 
         /* Is this slot empty? If yes, skip. */
-        if (ota_slots_validate_metadata(&fw_slot_metadata) == false) {
+        if (ota_slots_validate_metadata(&fw_slot_metadata) != 0) {
             continue;
         }
 
@@ -333,7 +333,7 @@ int ota_slots_find_empty_int_slot(void)
         }
 
         /* Is this slot invalid? If yes, let's treat it as empty. */
-        if (ota_slots_validate_metadata(&fw_slot_metadata) == false) {
+        if (ota_slots_validate_metadata(&fw_slot_metadata) != 0) {
             return slot;
         }
     }
@@ -350,7 +350,7 @@ int ota_slots_find_empty_int_slot(void)
 int ota_slots_find_oldest_int_image(void)
 {
     /* The oldest firmware should be the v0 */
-    int oldest_fw_slot = 1;
+    int oldest_fw_slot = 0;
     uint16_t oldest_firmware_version = 0;
 
     /* Iterate through each of the MAX_FW_SLOTS internal slots. */
@@ -366,7 +366,7 @@ int ota_slots_find_oldest_int_image(void)
         }
 
         /* Is this slot populated? If not, skip. */
-        if (ota_slots_validate_metadata(&fw_slot_metadata) == false) {
+        if (ota_slots_validate_metadata(&fw_slot_metadata) != 0) {
             continue;
         }
 
@@ -408,7 +408,7 @@ int ota_slots_find_newest_int_image(void)
         }
 
         /* Is this slot populated? If not, skip. */
-        if (ota_slots_validate_metadata(&fw_slot_metadata) == -1) {
+        if (ota_slots_validate_metadata(&fw_slot_metadata) != 0) {
             continue;
         }
 
@@ -425,7 +425,6 @@ int ota_slots_find_newest_int_image(void)
     return newest_fw_slot;
 }
 
-// TODO_JB: test
 int ota_slots_erase_int_image(uint8_t fw_slot)
 {
     /* Get page address of the fw_slot in internal flash */
@@ -461,7 +460,7 @@ int ota_slots_erase_int_image(uint8_t fw_slot)
     }
 #else
     int slot_last_page = flashsector_sector((void *)(fw_image_base_address + get_slot_size(fw_slot) - 1));
-    for (int sector = slot_page; sector < slot_last_page; sector++) {
+    for (int sector = slot_page; sector <= slot_last_page; sector++) {
         DEBUG("[ota_slots] Erasing sector %d\n", page);
         flashsector_write(sector, NULL, 0);
     }
