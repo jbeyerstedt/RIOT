@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Freie Universität Berlin
+ * Copyright (C) 2017 Jannik Beyerstedt <jannik.beyerstedt@haw-hamburg.de>
  *
  * This file is subject to the terms and conditions of the GNU Lesser
  * General Public License v2.1. See the file LICENSE in the top level
@@ -11,9 +11,9 @@
  * @{
  *
  * @file
- * @brief       Example application for demonstrating the RIOT network stack
+ * @brief       Example application for demonstrating the OTA Update module
  *
- * @author      Hauke Petersen <hauke.petersen@fu-berlin.de>
+ * @author      Jannik Beyerstedt <jannik.beyerstedt@haw-hamburg.de>
  *
  * @}
  */
@@ -22,13 +22,40 @@
 
 #include "shell.h"
 #include "msg.h"
+#include "ota_updater.h"
+#include "ota_slots.h"
 
 #define MAIN_QUEUE_SIZE     (8)
 static msg_t _main_msg_queue[MAIN_QUEUE_SIZE];
 
-extern int udp_cmd(int argc, char **argv);
+int ota_request_cmd(int argc, char **argv) {
+    return ota_updater_request_update();
+}
+
+int ota_download_cmd(int argc, char **argv) {
+    return ota_updater_download();
+}
+
+int ota_install_cmd(int argc, char **argv) {
+    return ota_updater_install();
+}
+
+int ota_reboot_cmd(int argc, char **argv) {
+    ota_updater_reboot();
+    return 0;
+}
+
+int view_slots_cmd(int argc, char **argv) {
+    ota_slots_find_oldest_int_image();
+    return 0;
+}
 
 static const shell_command_t shell_commands[] = {
+    { "ota_request", "Send request to update server", ota_request_cmd },
+    { "ota_download", "Download the requested update", ota_download_cmd },
+    { "ota_install", "Install the downloaded update", ota_install_cmd },
+    { "ota_reboot", "Reboot device", ota_reboot_cmd },
+    { "view_slots", "View FW Slots", view_slots_cmd },
     { NULL, NULL, NULL }
 };
 

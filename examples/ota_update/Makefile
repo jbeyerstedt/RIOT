@@ -25,7 +25,7 @@ OTA_VTOR_ALIGN = 0x200          # only for VTOR alignment
 HW_ID = 0xabc0123456789def
 
 # Define the version number (must be strictly ascending) of this firmware
-FW_VERS = 0x1
+FW_VERS = 0x3
 # FW_VERS_2 is used for manual/ testing population of both slots only
 FW_VERS_2 = 0x2
 
@@ -111,6 +111,7 @@ bootloader:
 
 # compile application for manual testing
 ota_update_app-test-slot1:
+	@cp keys.c ../ota_update_app
 	@cd ../ota_update_app; \
 	CFLAGS="-DFW_SLOT=1 -DOTA_HW_ID=$(OTA_HW_ID) -DOTA_FW_VERS=$(FW_VERS) \
 	-DFW_SLOTS=1 -DOTA_UPDATE=$(OTA_UPDATE) -DOTA_VTOR_ALIGN=$(OTA_VTOR_ALIGN)" \
@@ -126,6 +127,7 @@ ota_update_app-file-slot1: ota_update_app-test-slot1
 
 # compile application for manual testing (use FW_VERS_2)
 ota_update_app-test-slot2:
+	@cp keys.c ../ota_update_app
 	@cd ../ota_update_app; \
 	CFLAGS="-DFW_SLOT=2 -DOTA_HW_ID=$(OTA_HW_ID) -DOTA_FW_VERS=$(FW_VERS_2) \
 	-DFW_SLOTS=1 -DOTA_UPDATE=$(OTA_UPDATE) -DOTA_VTOR_ALIGN=$(OTA_VTOR_ALIGN)" \
@@ -137,6 +139,7 @@ ota_update_app-test-slot2:
 
 # compile application for update file (use FW_VERS)
 ota_update_app-file-slot2:
+	@cp keys.c ../ota_update_app
 	@cd ../ota_update_app; \
 	CFLAGS="-DFW_SLOT=2 -DOTA_HW_ID=$(OTA_HW_ID) -DOTA_FW_VERS=$(FW_VERS) \
 	-DFW_SLOTS=1 -DOTA_UPDATE=$(OTA_UPDATE) -DOTA_VTOR_ALIGN=$(OTA_VTOR_ALIGN)" \

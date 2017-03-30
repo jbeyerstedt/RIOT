@@ -632,6 +632,11 @@ ifneq (,$(filter ota_slots,$(USEMODULE)))
   USEPKG += tweetnacl
 endif
 
+ifneq (,$(filter ota_updater,$(USEMODULE)))
+  USEMODULE += ota_file
+  USEMODULE += ota_slots
+endif
+
 # include package dependencies
 -include $(USEPKG:%=$(RIOTPKG)/%/Makefile.dep)
 

@@ -35,6 +35,11 @@ USEMODULE += netstats_l2
 USEMODULE += netstats_ipv6
 USEMODULE += netstats_rpl
 
+USEMODULE += ota_updater
+
+# tweetnacl needs more stack
+CFLAGS += '-DTHREAD_STACKSIZE_MAIN=(THREAD_STACKSIZE_DEFAULT + 3072)'
+
 GNRC_NETIF_NUMOF := 2
 USEMODULE += ethos gnrc_netdev
 CFLAGS += '-DETHOS_UART=UART_DEV(0)' -DETHOS_BAUDRATE=115200 -DUSE_ETHOS_FOR_STDIO
