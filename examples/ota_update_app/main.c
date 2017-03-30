@@ -64,7 +64,7 @@ int main(void)
     /* we need a message queue for the thread running the shell in order to
      * receive potentially fast incoming networking packets */
     msg_init_queue(_main_msg_queue, MAIN_QUEUE_SIZE);
-    puts("RIOT network stack example application");
+    puts("RIOT OTA update module example");
 
     /* start shell */
     puts("All up, running the shell now");

@@ -41,7 +41,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <tweetnacl.h>
 #include "ota_slots.h"
 #include "cpu_conf.h"
 #include "irq.h"
@@ -50,6 +49,7 @@
 #else
 #include "periph/flashsector.h"
 #endif
+#include "tweetnacl.h"
 #include "hashes/sha256.h"
 
 #define ENABLE_DEBUG (0)
@@ -127,7 +127,6 @@ void ota_slots_print_metadata(OTA_FW_metadata_t *metadata)
     printf("Firmware Version: %#x\n", metadata->fw_vers);
     printf("Firmware Base Address: %#lx\n", metadata->fw_base_addr);
     printf("Firmware Size: %ld Byte (0x%02lx)\n", metadata->size, metadata->size);
-    printf("\n");
 }
 
 int ota_slots_validate_int_slot(uint8_t fw_slot)
@@ -159,7 +158,7 @@ int ota_slots_validate_int_slot(uint8_t fw_slot)
         printf("[ota_slots] ERROR cannot get slot metadata.\n");
     }
 
-    printf("Verifying slot %d at 0x%lx \n", fw_slot, fw_image_address);
+    printf("Validating slot %d at 0x%lx \n", fw_slot, fw_image_address);
 
     /* check magic number first */
     if (OTA_FW_META_MAGIC != fw_metadata.magic) {
@@ -199,7 +198,7 @@ int ota_slots_validate_int_slot(uint8_t fw_slot)
 
     int res = crypto_box_open(sign_hash, fw_signature, OTA_FW_SIGN_LEN, n, server_pkey, firmware_skey);
     if (res) {
-        printf("Decryption failed.\n");
+        printf("[ota_slots] ERROR Decryption failed.\n");
         return -1;
     }
     else {
@@ -339,7 +338,7 @@ int ota_slots_find_empty_int_slot(void)
     }
 
     printf("[ota_slots] Could not find any empty FW slots!"
-           "\nSearching for oldest FW slot...\n");
+           "\nSearching for oldest FW slot instead...\n");
     /*
      * If execution goes this far, no empty slot was found. Now, we look for
      * the oldest FW slot instead.
@@ -352,6 +351,8 @@ int ota_slots_find_oldest_int_image(void)
     /* The oldest firmware should be the v0 */
     int oldest_fw_slot = 0;
     uint16_t oldest_firmware_version = 0;
+
+    printf("[ota_slots] Finding oldest FW slot, availabe slots are:\n");
 
     /* Iterate through each of the MAX_FW_SLOTS internal slots. */
     for (int slot = 1; slot <= MAX_FW_SLOTS; slot++) {
@@ -394,6 +395,8 @@ int ota_slots_find_newest_int_image(void)
     /* At first, we only assume knowledge of version v0 */
     int newest_fw_slot = 0;
     uint16_t newest_firmware_version = 0;
+
+    printf("[ota_slots] Finding newest FW slot, availabe slots are:\n");
 
     /* Iterate through each of the MAX_FW_SLOTS. */
     for (int slot = 1; slot <= MAX_FW_SLOTS; slot++) {
@@ -465,7 +468,6 @@ int ota_slots_erase_int_image(uint8_t fw_slot)
         flashsector_write(sector, NULL, 0);
     }
 #endif
-
 
     printf("[ota_slots] Erase successful\n");
 

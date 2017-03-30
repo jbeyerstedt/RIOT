@@ -57,8 +57,8 @@ static void int_flash_read(uint8_t *data_buffer, uint32_t address, uint32_t coun
 
 int ota_file_validate_file(uint32_t file_address)
 {
-    OTA_File_header_t* file_header = (OTA_File_header_t*)(OTA_FILE_SLOT);
-    OTA_FW_metadata_t* fw_metadata = &file_header->fw_header.fw_metadata;
+    OTA_File_header_t *file_header = (OTA_File_header_t *)(OTA_FILE_SLOT);
+    OTA_FW_metadata_t *fw_metadata = &file_header->fw_header.fw_metadata;
     uint32_t address;
     uint16_t rest;
     sha256_context_t sha256_ctx;
@@ -66,10 +66,10 @@ int ota_file_validate_file(uint32_t file_address)
     uint8_t sign_hash[OTA_FILE_SIGN_LEN];
     int parts = 0;
 
-    printf("[ota_file] Validating firmware update file\n");
+    DEBUG("[ota_file] Validating firmware update file with FW version %d\n", fw_metadata->fw_vers);
 
     /* check magic numbers first */
-    if ( (file_header->magic_h != (uint32_t)OTA_FW_FILE_MAGIC_H) || (file_header->magic_l != (uint32_t)OTA_FW_FILE_MAGIC_L) ) {
+    if ((file_header->magic_h != (uint32_t)OTA_FW_FILE_MAGIC_H) || (file_header->magic_l != (uint32_t)OTA_FW_FILE_MAGIC_L)) {
         return -1;
     }
     if (OTA_FW_META_MAGIC != fw_metadata->magic) {
@@ -111,7 +111,7 @@ int ota_file_validate_file(uint32_t file_address)
         return -1;
     }
     else {
-        printf("Decryption successful! verifying...\n");
+        DEBUG("Decryption successful! verifying...\n");
         for (int i = 0; i < SHA256_DIGEST_LENGTH; i++) {
             if (hash[i] != (sign_hash[i + crypto_box_ZEROBYTES])) {
                 printf("[ota_file] ERROR incorrect decrypted hash!\n");
@@ -134,8 +134,11 @@ int ota_file_write_image(uint32_t file_address, uint8_t fw_slot)
 {
     uint32_t fw_slot_base_addr;
     uint8_t slot_sector;
-    OTA_File_header_t* file_header = (OTA_File_header_t*)(OTA_FILE_SLOT);
+    OTA_File_header_t *file_header = (OTA_File_header_t *)(OTA_FILE_SLOT);
     uint8_t write_buf[32];
+
+    printf("[ota_file] Writing update file (FW vers. %d) to FW slot %d\n",
+           file_header->fw_header.fw_metadata.fw_vers, fw_slot);
 
     /* check some parameters */
     if (fw_slot > MAX_FW_SLOTS || fw_slot == 0) {
@@ -208,6 +211,8 @@ int ota_file_write_image(uint32_t file_address, uint8_t fw_slot)
         flashsector_write_only((void *)slot_write_addr, (void *)write_buf, binary_sections_rest);
         slot_write_addr += binary_sections_rest;
     }
+
+    printf("[ota_file] successfully wrote update file\n");
 
     return 0;
 }

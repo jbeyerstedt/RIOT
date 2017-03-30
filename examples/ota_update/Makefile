@@ -25,7 +25,7 @@ OTA_VTOR_ALIGN = 0x200          # only for VTOR alignment
 HW_ID = 0xabc0123456789def
 
 # Define the version number (must be strictly ascending) of this firmware
-FW_VERS = 0x3
+FW_VERS = 0x1
 # FW_VERS_2 is used for manual/ testing population of both slots only
 FW_VERS_2 = 0x2
 
@@ -106,7 +106,7 @@ bootloader:
 	@cd ../ota_bootloader; \
 	CFLAGS="-DOTA_FW_METADATA_SPACE=$(OTA_FW_METADATA_SPACE) -DHW_ID=$(HW_ID) \
 	-DOTA_FW_SIGN_SPACE=$(OTA_FW_SIGN_SPACE) -DOTA_VTOR_ALIGN=$(OTA_VTOR_ALIGN)" \
-	make -j clean all; \
+	make -j 4 clean all; \
 	cp bin/$(BOARD)/ota_bootloader.hex ../ota_update
 
 # compile application for manual testing
@@ -118,7 +118,7 @@ ota_update_app-test-slot1:
 	FW_SLOT=1 OTA_HW_ID=$(HW_ID) OTA_FW_VERS=$(FW_VERS) \
 	OTA_UPDATE=$(OTA_UPDATE) OTA_FW_METADATA_SPACE=$(OTA_FW_METADATA_SPACE) \
 	OTA_FW_BASE_ADDR=$(FW_IMAGE1_BASE) \
-	make -j clean all; \
+	make -j 4 clean all; \
 	cp bin/$(BOARD)/app_binary-$(HW_ID)-$(FW_VERS)-s1.bin ../ota_update
 
 # compile application for update file
@@ -134,7 +134,7 @@ ota_update_app-test-slot2:
 	FW_SLOT=2 OTA_HW_ID=$(HW_ID) OTA_FW_VERS=$(FW_VERS_2) \
 	OTA_UPDATE=$(OTA_UPDATE) OTA_FW_METADATA_SPACE=$(OTA_FW_METADATA_SPACE) \
 	OTA_FW_BASE_ADDR=$(FW_IMAGE2_BASE) \
-	make -j clean all; \
+	make -j 4 clean all; \
 	cp bin/$(BOARD)/app_binary-$(HW_ID)-$(FW_VERS_2)-s2.bin ../ota_update
 
 # compile application for update file (use FW_VERS)
@@ -146,7 +146,7 @@ ota_update_app-file-slot2:
 	FW_SLOT=2 OTA_HW_ID=$(HW_ID) OTA_FW_VERS=$(FW_VERS) \
 	OTA_UPDATE=$(OTA_UPDATE) OTA_FW_METADATA_SPACE=$(OTA_FW_METADATA_SPACE) \
 	OTA_FW_BASE_ADDR=$(FW_IMAGE2_BASE) \
-	make -j clean all; \
+	make -j 4 clean all; \
 	cp bin/$(BOARD)/app_binary-$(HW_ID)-$(FW_VERS)-s2.bin ../ota_update
 
 ### TARGETS WITH ALL IN ONE SERVICE ###
@@ -213,6 +213,17 @@ flash-updatefile-slot2:
 	HEXFILE=hex-updatefile-s2.hex \
 	../../dist/tools/openocd/openocd.sh flash
 
+### TARGETS FOR ETHOS COMMUNICATION
+# setup tap interface
+setup-ethos:
+	sudo ip tuntap add tap0 mode tap user $(USER)
+	sudo ip link set tap0 up
+
+# start ethos communitation
+ethos:
+	../../dist/tools/ethos/ethos tap0 /dev/ttyACM0
+
+### TARGETS TO CLEAN
 # cleans everything, but leaves the keys
 clean:
 	@rm *.hex *.bin
