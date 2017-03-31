@@ -203,7 +203,7 @@ int ota_file_write_image(uint32_t file_address, uint8_t fw_slot)
         // TODO_JB: Decryption
         /* decrypt a section of the binary to write_buf */
         for (int i = 0; i < binary_sections_rest; i++) {
-            write_buf[i] = file_read_addr;
+            write_buf[i] = *(uint8_t *)file_read_addr;
             file_read_addr++;
         }
 
