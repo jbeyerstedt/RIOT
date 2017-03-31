@@ -74,6 +74,20 @@ static unsigned char m[OTA_FILE_SIGN_LEN];
 
 static const unsigned char nonce[crypto_stream_NONCEBYTES];
 
+static int hex_char_to_int(char hex)
+{
+    if ((hex >= 0x30) && (hex <= 0x39)) {
+        return hex - 0x30;
+    }
+    else if ((hex >= 0x61) && (hex <= 0x66)) {
+        return hex - 0x61 + 10;
+    }
+    else if ((hex >= 0x41) && (hex <= 0x46)) {
+        return hex - 0x41 + 10;
+    }
+    return -1;
+}
+
 int main(int argc, char *argv[])
 {
     OTA_FW_metadata_t metadata;
@@ -82,6 +96,7 @@ int main(int argc, char *argv[])
     int bytes_read = 0;
     uint8_t sha256_hash[SHA256_DIGEST_LENGTH];
 
+    uint8_t fw_metadata_block[OTA_FW_METADATA_SPACE];
     uint8_t fw_signature[OTA_FW_SIGN_LEN];
 
 #ifndef IMAGE_ONLY
@@ -106,7 +121,7 @@ int main(int argc, char *argv[])
     }
 
     if (argv[4]) {
-        printf("THIS IMAGE WILL ONLY WORK ON ONE DEVICE!\n");
+        printf("WARNING: THIS IMAGE WILL ONLY WORK ON ONE DEVICE!\n");
     }
 
     /*
@@ -139,6 +154,10 @@ int main(int argc, char *argv[])
 
     /* open the firmware image .bin file */
     slot_bin = fopen(argv[1], "r");
+    if (slot_bin == NULL) {
+        printf("ERROR! Cannot open firmware binary file\n");
+        return -1;
+    }
 
     /*
      *  if neccesary, set chip id
@@ -152,19 +171,55 @@ int main(int argc, char *argv[])
     memcpy(&metadata, &firmware_buffer, sizeof(OTA_FW_metadata_t));
 
     if (argv[4]) {
-        /*
-         * TODO_JB: read chip id from argument, write to metadata.chip_id
-         */
-        ;
+        /* read chip id from argument, write to metadata.chip_id */
+        char *char_ptr = argv[4];
+
+        printf("chip_id set to: 0x");
+
+        if (*(char_ptr + 1) == 'x') {     /* skip 0x prefix */
+            char_ptr += 2;
+        }
+        for (uint8_t i = 0; i < (sizeof(metadata.chip_id)); i++) {
+            int value = 0;
+
+            value = hex_char_to_int(*(char_ptr++));
+            if (value < 0) {
+                printf("\nERROR invalid hex character\n");
+                return -1;
+            }
+            metadata.chip_id[i] = ((uint8_t)value << 4) & 0xF0;
+
+            value = hex_char_to_int(*(char_ptr++));
+            if (value < 0) {
+                printf("\nERROR invalid hex character\n");
+                return -1;
+            }
+            metadata.chip_id[i] |= ((uint8_t)value) & 0x0F;
+
+            printf("%02x ", metadata.chip_id[i]);
+        }
+
+        printf("\n");
+    }
+
+    /*
+     *  copy metadata with correct spacing to fw_metadata_block
+     */
+    memcpy(fw_metadata_block, (uint8_t *)&metadata, sizeof(OTA_FW_metadata_t));
+    for (uint8_t i = sizeof(OTA_FW_metadata_t); i < OTA_FW_METADATA_SPACE; i++) {
+        fw_metadata_block[i] = 0xff;
     }
 
     /*
      *  generate firmware signature (inner signature)
      */
-
-    /* read the image file (metadata + binary) and calculate hash */
-    fseek(slot_bin, 0, SEEK_SET);
     sha256_init(&firmware_sha256);
+
+    /* begin hash with (modified) metadata block */
+    sha256_update(&firmware_sha256, fw_metadata_block, sizeof(fw_metadata_block));
+
+    /* continue hash with binary data from image file */
+    fseek(slot_bin, OTA_FW_METADATA_SPACE, SEEK_SET);
     while ((bytes_read = fread(firmware_buffer, 1, sizeof(firmware_buffer), slot_bin))) {
         sha256_update(&firmware_sha256, firmware_buffer, bytes_read);
     }
@@ -182,7 +237,7 @@ int main(int argc, char *argv[])
      */
 
     /* Open the output firmware .bin file */
-    updatefile_bin = fopen("ota_flash_image.bin", "w+");
+    updatefile_bin = fopen("ota_flash_image.bin", "w");
 
     /* generate spacing for correct VTOR alignment */
     uint8_t spacing_buffer[OTA_VTOR_ALIGN - (OTA_FW_METADATA_SPACE + OTA_FW_SIGN_SPACE)];
@@ -193,7 +248,6 @@ int main(int argc, char *argv[])
 
     /* save the signature first */
     fwrite(fw_signature, sizeof(fw_signature), 1, updatefile_bin);
-
 #if (OTA_FW_SIGN_SPACE > OTA_FW_SIGN_LEN)
     uint8_t blank_buffer[OTA_FW_SIGN_SPACE - sizeof(fw_signature)];
     for (unsigned long b = 0; b < sizeof(blank_buffer); b++) {
@@ -202,8 +256,11 @@ int main(int argc, char *argv[])
     fwrite(blank_buffer, sizeof(blank_buffer), 1, updatefile_bin);
 #endif /* (OTA_FW_SIGN_SPACE > OTA_FW_SIGN_LEN) */
 
+    /* save the (potentially) modified metadata */
+    fwrite(fw_metadata_block, sizeof(fw_metadata_block), 1, updatefile_bin);
+
     /* then copy the binary to the output file */
-    fseek(slot_bin, 0, SEEK_SET);
+    fseek(slot_bin, OTA_FW_METADATA_SPACE, SEEK_SET); /* set to beginning of binary part */
     while ((bytes_read = fread(firmware_buffer, 1, sizeof(firmware_buffer), slot_bin))) {
         fwrite(firmware_buffer, bytes_read, 1, updatefile_bin);
     }
@@ -222,6 +279,7 @@ int main(int argc, char *argv[])
     tmp_file = fopen("tmp_file", "w+");
     uint8_t blank_buffer[0x200];
 
+    /* save the signature first */
     fwrite(fw_signature, sizeof(fw_signature), 1, tmp_file);
 #if (OTA_FW_SIGN_SPACE > OTA_FW_SIGN_LEN)
     for (unsigned long b = 0; b < (OTA_FW_SIGN_SPACE - sizeof(fw_signature)); b++) {
@@ -230,13 +288,8 @@ int main(int argc, char *argv[])
     fwrite(blank_buffer, sizeof(blank_buffer), 1, tmp_file);
 #endif /* (OTA_FW_SIGN_SPACE > OTA_FW_SIGN_LEN) */
 
-    uint8_t output_buffer[sizeof(OTA_FW_metadata_t)];
-    memcpy(output_buffer, (uint8_t *)&metadata, sizeof(OTA_FW_metadata_t));
-    fwrite(output_buffer, sizeof(output_buffer), 1, tmp_file);
-    for (unsigned long b = 0; b < (OTA_FW_METADATA_SPACE - sizeof(metadata)); b++) {
-        blank_buffer[b] = 0xff;
-    }
-    fwrite(blank_buffer, (OTA_FW_METADATA_SPACE - sizeof(metadata)), 1, tmp_file);
+    /* save the (potentially) modified metadata */
+    fwrite(fw_metadata_block, sizeof(fw_metadata_block), 1, tmp_file);
 
     /*
      *  encrypt the binary data and append to temp file
@@ -273,7 +326,7 @@ int main(int argc, char *argv[])
      *  generate output for flash image
      */
     /* Open the output firmware .bin file */
-    updatefile_bin = fopen("ota_update_file.bin", "w+");
+    updatefile_bin = fopen("ota_update_file.bin", "w");
 
     uint32_t magic = OTA_FW_FILE_MAGIC_H;
     fwrite(&magic, sizeof(magic), 1, updatefile_bin);

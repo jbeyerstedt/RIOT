@@ -27,6 +27,8 @@ _device-pkey:_ Path to the device's public key file
 _chip-id:_ (optional) The chip serial number, for which the firmware should be
                      signed. Maximum 16 bytes in HEX
 
+HEX numbers could be prefixed with `0x`, but must be one string without spaces.
+
 The results will be printed if the operation is successful, and a binary
 called `ota_update_file.bin` will be created.
 
