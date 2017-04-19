@@ -69,10 +69,7 @@ static unsigned char firmware_pkey[crypto_box_PUBLICKEYBYTES];
 static unsigned char server_skey[crypto_box_SECRETKEYBYTES];
 
 /* Crypto helpers */
-static const unsigned char n[crypto_box_NONCEBYTES];
 static unsigned char m[OTA_FILE_SIGN_LEN];
-
-static const unsigned char nonce[crypto_stream_NONCEBYTES];
 
 static int hex_char_to_int(char hex)
 {
@@ -90,14 +87,16 @@ static int hex_char_to_int(char hex)
 
 int main(int argc, char *argv[])
 {
-    OTA_FW_metadata_t metadata;
-    sha256_context_t firmware_sha256;
-    uint8_t firmware_buffer[1024];
+    uint8_t fread_buffer[1024];
     int bytes_read = 0;
+    OTA_FW_metadata_t metadata;
+    uint8_t fw_metadata_block[OTA_FW_METADATA_SPACE];
+
+    sha256_context_t sha256_ctx;
     uint8_t sha256_hash[SHA256_DIGEST_LENGTH];
 
-    uint8_t fw_metadata_block[OTA_FW_METADATA_SPACE];
     uint8_t fw_signature[OTA_FW_SIGN_LEN];
+    uint8_t sign_nonce[crypto_box_NONCEBYTES];
 
 #ifndef IMAGE_ONLY
     uint8_t file_signature[OTA_FILE_SIGN_LEN];
@@ -163,12 +162,12 @@ int main(int argc, char *argv[])
      *  if neccesary, set chip id
      */
     /* read metadata section from file */
-    bytes_read = fread(firmware_buffer, 1, OTA_FW_METADATA_SPACE, slot_bin);
+    bytes_read = fread(fread_buffer, 1, OTA_FW_METADATA_SPACE, slot_bin);
     if (bytes_read < OTA_FW_METADATA_SPACE) {
         printf("ERROR: something went wrong reading the metadata section\n");
         return -1;
     }
-    memcpy(&metadata, &firmware_buffer, sizeof(OTA_FW_metadata_t));
+    memcpy(&metadata, &fread_buffer, sizeof(OTA_FW_metadata_t));
 
     if (argv[4]) {
         /* read chip id from argument, write to metadata.chip_id */
@@ -213,23 +212,23 @@ int main(int argc, char *argv[])
     /*
      *  generate firmware signature (inner signature)
      */
-    sha256_init(&firmware_sha256);
+    sha256_init(&sha256_ctx);
 
     /* begin hash with (modified) metadata block */
-    sha256_update(&firmware_sha256, fw_metadata_block, sizeof(fw_metadata_block));
+    sha256_update(&sha256_ctx, fw_metadata_block, sizeof(fw_metadata_block));
 
     /* continue hash with binary data from image file */
     fseek(slot_bin, OTA_FW_METADATA_SPACE, SEEK_SET);
-    while ((bytes_read = fread(firmware_buffer, 1, sizeof(firmware_buffer), slot_bin))) {
-        sha256_update(&firmware_sha256, firmware_buffer, bytes_read);
+    while ((bytes_read = fread(fread_buffer, 1, sizeof(fread_buffer), slot_bin))) {
+        sha256_update(&sha256_ctx, fread_buffer, bytes_read);
     }
-    sha256_final(&firmware_sha256, sha256_hash);
+    sha256_final(&sha256_ctx, sha256_hash);
 
     /* encrypt hash using crypto_box of tweetNaCl */
     memset(m, 0, crypto_box_ZEROBYTES);
     memcpy(m + crypto_box_ZEROBYTES, sha256_hash, OTA_FW_SIGN_LEN - crypto_box_ZEROBYTES);
 
-    crypto_box(fw_signature, m, OTA_FW_SIGN_LEN, n, firmware_pkey, server_skey);
+    crypto_box(fw_signature, m, OTA_FW_SIGN_LEN, sign_nonce, firmware_pkey, server_skey);
 
 #ifdef IMAGE_ONLY
     /*
@@ -261,8 +260,8 @@ int main(int argc, char *argv[])
 
     /* then copy the binary to the output file */
     fseek(slot_bin, OTA_FW_METADATA_SPACE, SEEK_SET); /* set to beginning of binary part */
-    while ((bytes_read = fread(firmware_buffer, 1, sizeof(firmware_buffer), slot_bin))) {
-        fwrite(firmware_buffer, bytes_read, 1, updatefile_bin);
+    while ((bytes_read = fread(fread_buffer, 1, sizeof(fread_buffer), slot_bin))) {
+        fwrite(fread_buffer, bytes_read, 1, updatefile_bin);
     }
 
     /* Close the output file */
@@ -294,7 +293,7 @@ int main(int argc, char *argv[])
     /*
      *  encrypt the binary data and append to temp file
      */
-    // TODO_JB: generate random nonce for crypto_stream encryption!
+    // TODO_JB: generate random aes_iv!
 
     fseek(slot_bin, OTA_FW_METADATA_SPACE, SEEK_SET);
     while ((bytes_read = fread(firmware_buffer, 1, sizeof(firmware_buffer), slot_bin))) {
@@ -309,18 +308,18 @@ int main(int argc, char *argv[])
 
     /* calculate hash of encrypted binary, the metadata and the firmware signature (temp file) */
     fseek(tmp_file, 0, SEEK_SET);
-    sha256_init(&firmware_sha256);
-    while ((bytes_read = fread(firmware_buffer, 1, sizeof(firmware_buffer), tmp_file))) {
-        sha256_update(&firmware_sha256, firmware_buffer, bytes_read);
+    sha256_init(&sha256_ctx);
+    while ((bytes_read = fread(fread_buffer, 1, sizeof(fread_buffer), tmp_file))) {
+        sha256_update(&sha256_ctx, fread_buffer, bytes_read);
     }
-    sha256_final(&firmware_sha256, sha256_hash);
+    sha256_final(&sha256_ctx, sha256_hash);
 
-    /* encrypt the hash and nonce with crypto_box */
+    /* encrypt the hash and aes_iv with crypto_box */
     memset(m, 0, crypto_box_ZEROBYTES);
     memcpy(m + crypto_box_ZEROBYTES, sha256_hash, SHA256_DIGEST_LENGTH);
-    memcpy(m + crypto_box_ZEROBYTES + SHA256_DIGEST_LENGTH, nonce, crypto_stream_NONCEBYTES);
+    memcpy(m + crypto_box_ZEROBYTES + SHA256_DIGEST_LENGTH, aes_iv, AES_BLOCK_SIZE);
 
-    crypto_box(file_signature, m, OTA_FILE_SIGN_LEN, n, firmware_pkey, server_skey);
+    crypto_box(file_signature, m, OTA_FILE_SIGN_LEN, sign_nonce, firmware_pkey, server_skey);
 
     /*
      *  generate output for flash image
@@ -343,8 +342,8 @@ int main(int argc, char *argv[])
 
     /* then copy the temp file to the output file */
     fseek(tmp_file, 0, SEEK_SET);
-    while ((bytes_read = fread(firmware_buffer, 1, sizeof(firmware_buffer), tmp_file))) {
-        fwrite(firmware_buffer, bytes_read, 1, updatefile_bin);
+    while ((bytes_read = fread(fread_buffer, 1, sizeof(fread_buffer), tmp_file))) {
+        fwrite(fread_buffer, bytes_read, 1, updatefile_bin);
     }
 
     /* Close the temp file */
