@@ -1,16 +1,18 @@
 RIOTBASE := ../../..
 RIOT_INCLUDE = $(RIOTBASE)/sys/include
-TWEETNACL_INCLUDE := tweetnacl
-SHA256_DIR := $(RIOTBASE)/sys/hashes
-SHA256_INCLUDE := $(RIOT_INCLUDE)/hashes
-TWEETNACL_DIR := tweetnacl
-TWEETNACL_SRC := $(TWEETNACL_DIR)/tweetnacl.c randombytes.c
-METADATA_SRC := generate-ota_update_file.c $(SHA256_DIR)/sha256.c $(TWEETNACL_SRC)
-METADATA_HDR := $(RIOT_INCLUDE)/ota_file.h $(RIOT_INCLUDE)/hashes/sha256.h $(TWEETNACL_INCLUDE)/tweetnacl.h
+
 GITCACHE = ../git/git-cache
 TWEETNACL_URL = https://github.com/RIOT-OS/tweetnacl.git
 TWEETNACL_VERSION = 7ea05c7098a16c87fa66e9166ce301666f3f2623
 
+SHA256_DIR := $(RIOTBASE)/sys/hashes
+AES_DIR := $(RIOTBASE)/sys/crypto
+CBC_DIR := $(RIOTBASE)/sys/crypto/modes
+TWEETNACL_DIR := tweetnacl
+TWEETNACL_INC := tweetnacl
+TWEETNACL_SRC := $(TWEETNACL_DIR)/tweetnacl.c randombytes.c
+
+SOURCES := generate-ota_update_file.c $(SHA256_DIR)/sha256.c $(CBC_DIR)/cbc.c $(AES_DIR)/ciphers.c $(AES_DIR)/aes.c $(TWEETNACL_SRC)
 CFLAGS += -g -O3 -Wall -Wextra -pedantic -std=c99
 
 .PHONY: all bin bin/generate-ota_update_file bin/generate-ota_flash_image
@@ -27,11 +29,11 @@ git-fetch-tweetnacl:
 	touch $@
 
 bin/generate-ota_update_file: git-fetch-tweetnacl
-	$(CC) $(CFLAGS) -I$(RIOT_INCLUDE) -I$(TWEETNACL_INCLUDE) $(METADATA_SRC) -o $@
+	$(CC) $(CFLAGS) -I$(RIOT_INCLUDE) -I$(TWEETNACL_INC) $(SOURCES) -o $@
 
 bin/generate-ota_flash_image: CFLAGS += -DIMAGE_ONLY=1
 bin/generate-ota_flash_image: git-fetch-tweetnacl
-	$(CC) $(CFLAGS) -I$(RIOT_INCLUDE) -I$(TWEETNACL_INCLUDE) $(METADATA_SRC) -o $@
+	$(CC) $(CFLAGS) -I$(RIOT_INCLUDE) -I$(TWEETNACL_INC) $(SOURCES) -o $@
 
 clean:
 	rm -rf bin/
