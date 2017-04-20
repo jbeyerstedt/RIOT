@@ -185,7 +185,7 @@ sign-image-slot2:
 	mv ota_flash_image.bin fw_image-$(HW_ID)-$(FW_VERS_2)-s2.bin
 
 ### TARGETS TO FLASH THE DEVICE ###
-# flashes the master-hex
+# flashes the test-hex
 flash-test:
 	OPENOCD_CONFIG=../../boards/$(BOARD)/dist/openocd.cfg \
 	HEXFILE=hex-slotstest.hex \
