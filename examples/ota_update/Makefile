@@ -53,7 +53,7 @@ else              # parameters for paged flash
 	FW_IMAGE2_END = 0x08080000      # FW_IMAGE_OFFSET + FW_IMAGE_LENGTH
 endif
 
-OTA_FILE_OFFSET = 0x08060000        # starte at sector 7
+OTA_FILE_OFFSET = 0x08060000        # Start at sector 7
 OTA_FILE_LENGTH = 0x20000           # Reserve whole sector 7
 
 ### TARGETS TO INITIALIZE ALL TOOLS ###
@@ -105,7 +105,8 @@ bootloader:
 	@cp keys.c ../ota_bootloader
 	@cd ../ota_bootloader; \
 	CFLAGS="-DOTA_FW_METADATA_SPACE=$(OTA_FW_METADATA_SPACE) -DHW_ID=$(HW_ID) \
-	-DOTA_FW_SIGN_SPACE=$(OTA_FW_SIGN_SPACE) -DOTA_VTOR_ALIGN=$(OTA_VTOR_ALIGN)" \
+	-DOTA_FW_SIGN_SPACE=$(OTA_FW_SIGN_SPACE) -DOTA_VTOR_ALIGN=$(OTA_VTOR_ALIGN) \
+	-DOTA_UPDATE=$(OTA_UPDATE)" \
 	make -j 4 clean all; \
 	cp bin/$(BOARD)/ota_bootloader.hex ../ota_update
 

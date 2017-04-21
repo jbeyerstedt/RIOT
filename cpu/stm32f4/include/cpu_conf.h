@@ -231,7 +231,7 @@ static inline uint32_t get_slot_size(uint8_t slot)
 #define CPU_DEFAULT_IRQ_PRIO            (1U)
 #define CPU_IRQ_NUMOF                   (82U)
 
-#ifdef FW_SLOTS
+#if defined(FW_SLOTS) && defined(CURRENT_FIRMWARE_ADDR)
 #define CPU_FLASH_BASE                  (CURRENT_FIRMWARE_ADDR + FW_METADATA_SPACE)
 #else
 #define CPU_FLASH_BASE                  FLASH_BASE

@@ -12,7 +12,7 @@ which must be declared in the linker scripts of your board.
 
 
 ### Options to set
-At the top of the Makefile are some options, which configure the whole process.
+At the top of the Makefile are some options, which configure the parametes of the process.
 Currently only sectored flash is fully supported, which is set by `SECTORS = 1`.
 
 Because the Makefile scripts can not calculate numbers, some variables have
@@ -35,6 +35,7 @@ OTA_VTOR_ALIGN = 0x200          # only for VTOR alignment
 - `FW_VERS_2`: for manual testing where both slots will be populated without installins via an update file
 
 ##### addresses and sizes of the memory slots
+These constants must be changed in the `cpu_conf.h` as well!
 - `FW_IMAGE1_OFFSET`: start address of slot 1 (after BOOTLOADER_SPACE)
 - `FW_IMAGE1_LENGTH`: size of slot 1
 - `FW_IMAGE1_END`: FW_IMAGE_OFFSET + FW_IMAGE_LENGTH
