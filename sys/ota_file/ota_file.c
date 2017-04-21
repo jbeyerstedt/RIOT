@@ -32,15 +32,13 @@
 #define ENABLE_DEBUG (0)
 #include "debug.h"
 
-#define AES_BUF_SIZE    (AES_BLOCK_SIZE * 4) // TODO_JB: recycle hashing_buffer
-
-static uint8_t n[crypto_stream_NONCEBYTES];
+#define BUF_SIZE        (AES_BLOCK_SIZE * 4)
 
 static uint8_t is_aeskey_set = 0;
 static uint8_t aes_key[AES_KEY_SIZE];
 static uint8_t aes_iv[AES_BLOCK_SIZE];
 
-static uint8_t hashing_buffer[1024]; // TODO_JB: use the same buffer for hashing and decryption
+static uint8_t buffer[BUF_SIZE];
 
 /**
  * @brief      Read internal flash to a buffer at specific address.
@@ -69,6 +67,7 @@ int ota_file_validate_file(uint32_t file_address)
     sha256_context_t sha256_ctx;
     uint8_t hash[SHA256_DIGEST_LENGTH];
     uint8_t sign_hash[OTA_FILE_SIGN_LEN];
+    uint8_t n[crypto_stream_NONCEBYTES];
     int parts = 0;
 
     DEBUG("[ota_file] Validating firmware update file with FW version %d\n", fw_metadata->fw_vers);
@@ -93,17 +92,17 @@ int ota_file_validate_file(uint32_t file_address)
     /* calculate hash of metadata section and encrypted firmware binary */
     address = (uint32_t)&file_header->fw_header;
     uint32_t encrypted_size = fw_metadata->size + (AES_BLOCK_SIZE - fw_metadata->size % AES_BLOCK_SIZE);
-    parts = (encrypted_size + OTA_FW_HEADER_SPACE) / sizeof(hashing_buffer);
-    rest = (encrypted_size + OTA_FW_HEADER_SPACE) % sizeof(hashing_buffer);
+    parts = (encrypted_size + OTA_FW_HEADER_SPACE) / sizeof(buffer);
+    rest = (encrypted_size + OTA_FW_HEADER_SPACE) % sizeof(buffer);
     sha256_init(&sha256_ctx);
     while (parts) {
-        int_flash_read(hashing_buffer, address, sizeof(hashing_buffer));
-        sha256_update(&sha256_ctx, hashing_buffer, sizeof(hashing_buffer));
-        address += sizeof(hashing_buffer);
+        int_flash_read(buffer, address, sizeof(buffer));
+        sha256_update(&sha256_ctx, buffer, sizeof(buffer));
+        address += sizeof(buffer);
         parts--;
     }
-    int_flash_read(hashing_buffer, address, rest);
-    sha256_update(&sha256_ctx, hashing_buffer, rest);
+    int_flash_read(buffer, address, rest);
+    sha256_update(&sha256_ctx, buffer, rest);
     sha256_final(&sha256_ctx, hash);
 
     /* open the crypto_box to extract the signed hash and compare hash values */
@@ -144,7 +143,6 @@ int ota_file_write_image(uint32_t file_address, uint8_t fw_slot)
     uint32_t fw_slot_base_addr;
     uint8_t slot_sector;
     OTA_File_header_t *file_header = (OTA_File_header_t *)(OTA_FILE_SLOT);
-    uint8_t write_buf[AES_BUF_SIZE];
 
     /*
      *  set up AES128 decryption
@@ -189,12 +187,12 @@ int ota_file_write_image(uint32_t file_address, uint8_t fw_slot)
     uint32_t file_read_addr = file_address + OTA_FW_FILE_MAGIC_LEN; /* skip FILE_MAGIC */
 #if (OTA_VTOR_ALIGN > OTA_FILE_HEADER_SPACE)
     /* add spacing in front of FILE_HEADER to have correct VTOR alignment */
-    for (int i = 0; i < sizeof(write_buf); i++) {
-        write_buf[i] = 0xAA;
+    for (int i = 0; i < sizeof(buffer); i++) {
+        buffer[i] = 0xAA;
     }
-    for (int i = 0; i < (OTA_VTOR_ALIGN - OTA_FILE_HEADER_SPACE) / sizeof(write_buf); i++) {
-        flashsector_write_only((void *)slot_write_addr, (void *)write_buf, sizeof(write_buf));
-        slot_write_addr += sizeof(write_buf);
+    for (int i = 0; i < (OTA_VTOR_ALIGN - OTA_FILE_HEADER_SPACE) / sizeof(buffer); i++) {
+        flashsector_write_only((void *)slot_write_addr, (void *)buffer, sizeof(buffer));
+        slot_write_addr += sizeof(buffer);
     }
 #endif
 
@@ -205,28 +203,28 @@ int ota_file_write_image(uint32_t file_address, uint8_t fw_slot)
 
     /* copy binary */
     uint32_t encrypted_size = fw_binary_size + (AES_BLOCK_SIZE - fw_binary_size % AES_BLOCK_SIZE);
-    uint32_t binary_sections = encrypted_size / sizeof(write_buf);
-    uint32_t binary_sections_rest = encrypted_size % sizeof(write_buf);
+    uint32_t binary_sections = encrypted_size / sizeof(buffer);
+    uint32_t binary_sections_rest = encrypted_size % sizeof(buffer);
     for (int i = 0; i < binary_sections; i++) {
-        /* decrypt a section of the binary to write_buf */
-        if (cipher_decrypt_cbc(&cipher_ctx, aes_iv, (uint8_t *)file_read_addr, sizeof(write_buf), write_buf) < 0) {
+        /* decrypt a section of the binary to buffer */
+        if (cipher_decrypt_cbc(&cipher_ctx, aes_iv, (uint8_t *)file_read_addr, sizeof(buffer), buffer) < 0) {
             printf("ERROR: Cipher decryption failed!\n");
             return -1;
         }
         /* manually set iv to last ciphertext block, because of silly CBC interface */
         for (int i = 0; i < AES_BLOCK_SIZE; i++) {
-            aes_iv[i] = ((uint8_t *)file_read_addr)[AES_BUF_SIZE - AES_BLOCK_SIZE + i];
+            aes_iv[i] = ((uint8_t *)file_read_addr)[BUF_SIZE - AES_BLOCK_SIZE + i];
         }
         /* move read ptr forward */
-        file_read_addr += sizeof(write_buf);
+        file_read_addr += sizeof(buffer);
 
-        /* copy write_buf to flash */
-        flashsector_write_only((void *)slot_write_addr, (void *)write_buf, sizeof(write_buf));
-        slot_write_addr += sizeof(write_buf);
+        /* copy buffer to flash */
+        flashsector_write_only((void *)slot_write_addr, (void *)buffer, sizeof(buffer));
+        slot_write_addr += sizeof(buffer);
     }
     if (binary_sections_rest != 0) { /* binary_sections_rest will always be % AES_BLOCK_SIZE */
-        /* decrypt a section of the binary to write_buf */
-        if (cipher_decrypt_cbc(&cipher_ctx, aes_iv, (uint8_t *)file_read_addr, binary_sections_rest, write_buf) < 0) {
+        /* decrypt a section of the binary to buffer */
+        if (cipher_decrypt_cbc(&cipher_ctx, aes_iv, (uint8_t *)file_read_addr, binary_sections_rest, buffer) < 0) {
             printf("ERROR: Cipher decryption failed!\n");
             return -1;
         }
@@ -234,8 +232,8 @@ int ota_file_write_image(uint32_t file_address, uint8_t fw_slot)
         /* move read ptr forward */
         file_read_addr += binary_sections_rest;
 
-        /* copy write_buf to flash */
-        flashsector_write_only((void *)slot_write_addr, (void *)write_buf, binary_sections_rest);
+        /* copy buffer to flash */
+        flashsector_write_only((void *)slot_write_addr, (void *)buffer, binary_sections_rest);
         slot_write_addr += binary_sections_rest;
     }
 

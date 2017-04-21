@@ -139,7 +139,7 @@ int ota_slots_validate_int_slot(uint8_t fw_slot)
     sha256_context_t sha256_ctx;
     uint8_t hash[SHA256_DIGEST_LENGTH];
     uint8_t sign_hash[OTA_FW_SIGN_LEN];
-    unsigned char n[crypto_box_NONCEBYTES];
+    uint8_t n[crypto_box_NONCEBYTES];
     int parts = 0;
 
     /* Determine the external flash address corresponding to the FW slot */
