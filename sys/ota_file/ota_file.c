@@ -26,10 +26,8 @@
 #else
 #include "periph/flashsector.h"
 #endif
-#include "tweetnacl.h"
-#include "hashes/sha256.h"
+
 #include "crypto/modes/cbc.h"
-#include "crypto/aes.h"
 
 #define ENABLE_DEBUG (0)
 #include "debug.h"

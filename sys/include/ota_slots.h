@@ -80,14 +80,15 @@ extern "C" {
 /**
  *  @brief OTA_FW_SIGN_LEN:
  *         length of the (encrypted) firmware signature.
+ *         (32 Byte SHA256 + 32 Byte null padding)
  */
-#define OTA_FW_SIGN_LEN     64      /* 32 Byte SHA256 + 32 Byte null padding */
+#define OTA_FW_SIGN_LEN         (SHA256_DIGEST_LENGTH + 32)
 
 /**
  *  @brief OTA_FW_META_MAGIC:
  *         magic number to identify the firmware metadata block.
  */
-#define OTA_FW_META_MAGIC   (0x544f4952)    /* RIOT as hex, byte order swapped */
+#define OTA_FW_META_MAGIC   (0x3141544f)    /* OTA1 as hex, byte order swapped */
 
 /**
  * @brief Structure to store firmware metadata, 4 byte aligned

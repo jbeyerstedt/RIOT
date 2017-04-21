@@ -21,8 +21,11 @@
 #ifndef OTA_FILE_H
 #define OTA_FILE_H
 
-#include "hashes/sha256.h"
 #include "ota_slots.h"
+
+#include "tweetnacl.h"
+#include "hashes/sha256.h"
+#include "crypto/aes.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -37,8 +40,9 @@ extern "C" {
 /**
  *  @brief OTA_FW_SIGN_LEN:
  *         length of the (encrypted) firmware signature.
+ *         (32 Byte SHA256 + 16 Byte AES IV + 16 Byte AES Key + 32 Byte null padding)
  */
-#define OTA_FILE_SIGN_LEN   96      /* 32 Byte SHA256 + 16 Byte AES IV + 16 Byte AES Key + 32 Byte null padding */
+#define OTA_FILE_SIGN_LEN       (SHA256_DIGEST_LENGTH + AES_BLOCK_SIZE + AES_KEY_SIZE + crypto_box_ZEROBYTES)
 
 /**
  *  @brief OTA_FW_META_MAGIC:

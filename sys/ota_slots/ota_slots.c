@@ -49,8 +49,8 @@
 #else
 #include "periph/flashsector.h"
 #endif
+
 #include "tweetnacl.h"
-#include "hashes/sha256.h"
 
 #define ENABLE_DEBUG (0)
 #include "debug.h"
@@ -113,7 +113,7 @@ uint32_t ota_slots_get_fw_signature_addr(uint8_t fw_slot)
 
 void ota_slots_print_metadata(OTA_FW_metadata_t *metadata)
 {
-    printf("\nFirmware metadata dump:\n");
+    printf("Firmware metadata dump:\n");
     printf("Firmware HW ID: ");
     for (unsigned long i = 0; i < sizeof(metadata->hw_id); i++) {
         printf("%02x ", metadata->hw_id[i]);
@@ -127,6 +127,7 @@ void ota_slots_print_metadata(OTA_FW_metadata_t *metadata)
     printf("Firmware Version: %#x\n", metadata->fw_vers);
     printf("Firmware Base Address: %#lx\n", metadata->fw_base_addr);
     printf("Firmware Size: %ld Byte (0x%02lx)\n", metadata->size, metadata->size);
+    printf("\n");
 }
 
 int ota_slots_validate_int_slot(uint8_t fw_slot)
@@ -137,7 +138,7 @@ int ota_slots_validate_int_slot(uint8_t fw_slot)
     uint16_t rest;
     sha256_context_t sha256_ctx;
     uint8_t hash[SHA256_DIGEST_LENGTH];
-    uint8_t sign_hash[SHA256_DIGEST_LENGTH + crypto_box_ZEROBYTES];
+    uint8_t sign_hash[OTA_FW_SIGN_LEN];
     unsigned char n[crypto_box_NONCEBYTES];
     int parts = 0;
 
@@ -151,10 +152,7 @@ int ota_slots_validate_int_slot(uint8_t fw_slot)
     /* Read the metadata of the corresponding FW slot */
     fw_image_address = ota_slots_get_slot_address(fw_slot);
 
-    if (ota_slots_get_int_slot_metadata(fw_slot, &fw_metadata) == 0) {
-        ota_slots_print_metadata(&fw_metadata);
-    }
-    else {
+    if (ota_slots_get_int_slot_metadata(fw_slot, &fw_metadata) != 0) {
         printf("[ota_slots] ERROR cannot get slot metadata.\n");
     }
 
