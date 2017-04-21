@@ -30,17 +30,23 @@ static msg_t _main_msg_queue[MAIN_QUEUE_SIZE];
 
 int ota_request_cmd(int argc, char **argv)
 {
-    return ota_updater_request_update();
+    int ret_val = ota_updater_request_update();
+    printf("ota_updater_request_update returned %i\n", ret_val);
+    return 0;
 }
 
 int ota_download_cmd(int argc, char **argv)
 {
-    return ota_updater_download();
+    int ret_val = ota_updater_download();
+    printf("ota_updater_download returned %i\n", ret_val);
+    return 0;
 }
 
 int ota_install_cmd(int argc, char **argv)
 {
-    return ota_updater_install();
+    int ret_val = ota_updater_install();
+    printf("ota_updater_install returned %i\n", ret_val);
+    return 0;
 }
 
 int ota_reboot_cmd(int argc, char **argv)

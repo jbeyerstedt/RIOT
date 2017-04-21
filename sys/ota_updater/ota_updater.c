@@ -27,7 +27,14 @@
 #define ENABLE_DEBUG (0)
 #include "debug.h"
 
-uint8_t is_update_availabe = 0;
+typedef enum update_status {
+    NOT_CHECKED,
+    INTERRUPTED_UPDATE,
+    UPDATE_AVAILABLE,
+    NO_UPDATE_AVAILABLE
+} update_status_t;
+update_status_t update_status = NOT_CHECKED;
+
 // TODO_JB_2: something to store the server address
 // TODO_JB_2: something to store the URI of the update to download
 
@@ -72,9 +79,27 @@ int ota_updater_request_update(void)
 {
     printf("[ota_updater] INFO requesting update\n");
 
-    // TODO_JB_2: implement some networking protocol to communicate with the server
-    // TODO_JB_2: return 1 if new firmware available, 0 if not or error code
+    OTA_FW_metadata_t own_metadata;
+    ota_slots_get_int_slot_metadata(FW_SLOT, &own_metadata);
 
+    /** first check, if there was an interrupted update **/
+    OTA_FW_metadata_t *file_metadata = &(((OTA_File_header_t *)(OTA_FILE_SLOT))->fw_header.fw_metadata);
+
+    /* an update file is available and has a valid signature (complete download) */
+    if (ota_updater_validate_file() == 0) {
+        /* version number is higher, than own version, indicates an interupted update */
+        if (file_metadata->fw_vers > own_metadata.fw_vers) {
+            printf("[ota_updater] INFO interrupted update detected\n");
+            update_status = INTERRUPTED_UPDATE;
+            return OTA_CONTINUE_INSTALL;
+        }
+        /* otherwise the file is already installed */
+    }
+
+    /** send request to update server, if a new version is available **/
+    // TODO_JB_2: implement some networking protocol to communicate with the server
+    // TODO_JB_2: return 1 if new firmware available, 0 if not or -1 on error
+    update_status = UPDATE_AVAILABLE;   // TODO_JB: only used as dummy
     return 1;                           // TODO_JB: only used as dummy
 }
 
@@ -83,7 +108,19 @@ int ota_updater_download(void)
 {
     printf("[ota_updater] INFO downloading update\n");
 
-    return 0;
+    /* if an interrupted update was detected, skip the download */
+    if (UPDATE_AVAILABLE == update_status) {
+        /* download the file from the resource identified by ota_updater_request_update() */
+        // TODO_JB_2: download the file and store to OTA_FILE_SLOT
+        return 0;                       // TODO_JB: only used as dummy
+    }
+    else if (INTERRUPTED_UPDATE == update_status) {
+        DEBUG("[ota_updater] INFO skipping download because of interrupted update\n");
+        return OTA_CONTINUE_INSTALL;
+    }
+
+    DEBUG("[ota_updater] INFO do not download before requesting an update at all!\n");
+    return -1;  /* only reached, if someone has not followed the interface */
 }
 
 int ota_updater_install(void)
