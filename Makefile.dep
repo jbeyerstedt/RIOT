@@ -635,6 +635,9 @@ endif
 ifneq (,$(filter ota_updater,$(USEMODULE)))
   USEMODULE += ota_file
   USEMODULE += ota_slots
+  USEMODULE += crypto
+  USEMODULE += cipher_modes
+  CFLAGS += '-DCRYPTO_AES'
 endif
 
 # include package dependencies

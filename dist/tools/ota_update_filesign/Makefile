@@ -13,7 +13,7 @@ TWEETNACL_INC := tweetnacl
 TWEETNACL_SRC := $(TWEETNACL_DIR)/tweetnacl.c randombytes.c
 
 SOURCES := generate-ota_update_file.c $(SHA256_DIR)/sha256.c $(CBC_DIR)/cbc.c $(AES_DIR)/ciphers.c $(AES_DIR)/aes.c $(TWEETNACL_SRC)
-CFLAGS += -g -O3 -Wall -Wextra -pedantic -std=c99
+CFLAGS += -g -O3 -Wall -Wextra -pedantic -std=c99 -DCRYPTO_AES
 
 .PHONY: all bin bin/generate-ota_update_file bin/generate-ota_flash_image
 

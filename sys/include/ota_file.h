@@ -38,7 +38,7 @@ extern "C" {
  *  @brief OTA_FW_SIGN_LEN:
  *         length of the (encrypted) firmware signature.
  */
-#define OTA_FILE_SIGN_LEN   88      /* 32 Byte SHA256 + 24 Byte nonce + 32 Byte null padding */
+#define OTA_FILE_SIGN_LEN   96      /* 32 Byte SHA256 + 16 Byte AES IV + 16 Byte AES Key + 32 Byte null padding */
 
 /**
  *  @brief OTA_FW_META_MAGIC:

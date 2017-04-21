@@ -28,14 +28,21 @@
 #endif
 #include "tweetnacl.h"
 #include "hashes/sha256.h"
+#include "crypto/modes/cbc.h"
+#include "crypto/aes.h"
 
 #define ENABLE_DEBUG (0)
 #include "debug.h"
 
-static uint8_t n[crypto_stream_NONCEBYTES];
-static uint8_t is_nonce_set = 0;
+#define AES_BUF_SIZE    (AES_BLOCK_SIZE * 4) // TODO_JB: recycle hashing_buffer
 
-static uint8_t hashing_buffer[1024];
+static uint8_t n[crypto_stream_NONCEBYTES];
+
+static uint8_t is_aeskey_set = 0;
+static uint8_t aes_key[AES_KEY_SIZE];
+static uint8_t aes_iv[AES_BLOCK_SIZE];
+
+static uint8_t hashing_buffer[1024]; // TODO_JB: use the same buffer for hashing and decryption
 
 /**
  * @brief      Read internal flash to a buffer at specific address.
@@ -87,8 +94,9 @@ int ota_file_validate_file(uint32_t file_address)
     /** check file signature **/
     /* calculate hash of metadata section and encrypted firmware binary */
     address = (uint32_t)&file_header->fw_header;
-    parts = (fw_metadata->size + OTA_FW_HEADER_SPACE) / sizeof(hashing_buffer);
-    rest = (fw_metadata->size + OTA_FW_HEADER_SPACE) % sizeof(hashing_buffer);
+    uint32_t encrypted_size = fw_metadata->size + (AES_BLOCK_SIZE - fw_metadata->size % AES_BLOCK_SIZE);
+    parts = (encrypted_size + OTA_FW_HEADER_SPACE) / sizeof(hashing_buffer);
+    rest = (encrypted_size + OTA_FW_HEADER_SPACE) % sizeof(hashing_buffer);
     sha256_init(&sha256_ctx);
     while (parts) {
         int_flash_read(hashing_buffer, address, sizeof(hashing_buffer));
@@ -122,11 +130,14 @@ int ota_file_validate_file(uint32_t file_address)
 
     printf("[ota_file] Update file successfully validated\n");
 
-    /* copy nonce from signature */
-    for (int i = 0; i < sizeof(n); i++) {
-        n[i] = sign_hash[i + (crypto_box_ZEROBYTES + SHA256_DIGEST_LENGTH)];
+    /* copy aes_iv and aes_key from signature */
+    for (int i = 0; i < sizeof(aes_iv); i++) {
+        aes_iv[i] = sign_hash[i + (crypto_box_ZEROBYTES + SHA256_DIGEST_LENGTH)];
     }
-    is_nonce_set = 1;
+    for (int i = 0; i < sizeof(aes_key); i++) {
+        aes_key[i] = sign_hash[i + (crypto_box_ZEROBYTES + SHA256_DIGEST_LENGTH + AES_BLOCK_SIZE)];
+    }
+    is_aeskey_set = 1;
     return 0;
 }
 
@@ -135,7 +146,17 @@ int ota_file_write_image(uint32_t file_address, uint8_t fw_slot)
     uint32_t fw_slot_base_addr;
     uint8_t slot_sector;
     OTA_File_header_t *file_header = (OTA_File_header_t *)(OTA_FILE_SLOT);
-    uint8_t write_buf[32];
+    uint8_t write_buf[AES_BUF_SIZE];
+
+    /*
+     *  set up AES128 decryption
+     */
+    cipher_t cipher_ctx;
+
+    if (cipher_init(&cipher_ctx, CIPHER_AES_128, aes_key, AES_KEY_SIZE) < 0) {
+        printf("ERROR Cipher init failed!\n");
+        return -1;
+    }
 
     printf("[ota_file] Writing update file (FW vers. %d) to FW slot %d\n",
            file_header->fw_header.fw_metadata.fw_vers, fw_slot);
@@ -147,7 +168,7 @@ int ota_file_write_image(uint32_t file_address, uint8_t fw_slot)
         return -1;
     }
 
-    if (0 == is_nonce_set) {
+    if (0 == is_aeskey_set) {
         printf("[ota_slots] call ota_file_validate_file() first!");
         return -1;
     }
@@ -185,27 +206,35 @@ int ota_file_write_image(uint32_t file_address, uint8_t fw_slot)
     file_read_addr += OTA_FILE_HEADER_SPACE;
 
     /* copy binary */
-    uint32_t binary_sections = fw_binary_size / sizeof(write_buf);
-    uint32_t binary_sections_rest = fw_binary_size % sizeof(write_buf);
+    uint32_t encrypted_size = fw_binary_size + (AES_BLOCK_SIZE - fw_binary_size % AES_BLOCK_SIZE);
+    uint32_t binary_sections = encrypted_size / sizeof(write_buf);
+    uint32_t binary_sections_rest = encrypted_size % sizeof(write_buf);
     for (int i = 0; i < binary_sections; i++) {
-        // TODO_JB: Decryption
         /* decrypt a section of the binary to write_buf */
-        for (int i = 0; i < sizeof(write_buf); i++) {
-            write_buf[i] = *(uint8_t *)file_read_addr;
-            file_read_addr++;
+        if (cipher_decrypt_cbc(&cipher_ctx, aes_iv, (uint8_t *)file_read_addr, sizeof(write_buf), write_buf) < 0) {
+            printf("ERROR: Cipher decryption failed!\n");
+            return -1;
         }
+        /* manually set iv to last ciphertext block, because of silly CBC interface */
+        for (int i = 0; i < AES_BLOCK_SIZE; i++) {
+            aes_iv[i] = ((uint8_t *)file_read_addr)[AES_BUF_SIZE - AES_BLOCK_SIZE + i];
+        }
+        /* move read ptr forward */
+        file_read_addr += sizeof(write_buf);
 
         /* copy write_buf to flash */
         flashsector_write_only((void *)slot_write_addr, (void *)write_buf, sizeof(write_buf));
         slot_write_addr += sizeof(write_buf);
     }
-    if (binary_sections_rest != 0) {
-        // TODO_JB: Decryption
+    if (binary_sections_rest != 0) { /* binary_sections_rest will always be % AES_BLOCK_SIZE */
         /* decrypt a section of the binary to write_buf */
-        for (int i = 0; i < binary_sections_rest; i++) {
-            write_buf[i] = *(uint8_t *)file_read_addr;
-            file_read_addr++;
+        if (cipher_decrypt_cbc(&cipher_ctx, aes_iv, (uint8_t *)file_read_addr, binary_sections_rest, write_buf) < 0) {
+            printf("ERROR: Cipher decryption failed!\n");
+            return -1;
         }
+        /* omit setting IV for next round, becaue it is not needed any more */
+        /* move read ptr forward */
+        file_read_addr += binary_sections_rest;
 
         /* copy write_buf to flash */
         flashsector_write_only((void *)slot_write_addr, (void *)write_buf, binary_sections_rest);

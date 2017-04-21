@@ -44,10 +44,15 @@
 #include <stdint.h>
 #include <string.h>
 #include <sys/resource.h>
+#include <time.h>
 
 #include "ota_file.h"
 #include "tweetnacl/tweetnacl.h"
 #include "hashes/sha256.h"
+#include "crypto/modes/cbc.h"
+#include "crypto/aes.h"
+
+#define AES_BUF_SIZE    (AES_BLOCK_SIZE * 32)
 
 /* Input unsigned slot binary .bin file */
 FILE *slot_bin;
@@ -85,6 +90,18 @@ static int hex_char_to_int(char hex)
     return -1;
 }
 
+/* return a random number between 0 and limit inclusive. */
+int rand_lim(int limit)
+{
+    int divisor = RAND_MAX / (limit + 1);
+    int retval;
+
+    do {
+        retval = rand() / divisor;
+    } while (retval > limit);
+    return retval;
+}
+
 int main(int argc, char *argv[])
 {
     uint8_t fread_buffer[1024];
@@ -96,7 +113,7 @@ int main(int argc, char *argv[])
     uint8_t sha256_hash[SHA256_DIGEST_LENGTH];
 
     uint8_t fw_signature[OTA_FW_SIGN_LEN];
-    uint8_t sign_nonce[crypto_box_NONCEBYTES];
+    uint8_t sign_nonce[crypto_box_NONCEBYTES] = { 0 };
 
 #ifndef IMAGE_ONLY
     uint8_t file_signature[OTA_FILE_SIGN_LEN];
@@ -273,6 +290,29 @@ int main(int argc, char *argv[])
 #else /* IMAGE_ONLY */
 
     /*
+     *  set up AES128 encryption
+     */
+    uint8_t aes_iv[AES_BLOCK_SIZE];
+    cipher_t cipher_ctx;
+    uint8_t aes_key[AES_KEY_SIZE] = { 0 };
+    uint8_t aes_read_buf[AES_BUF_SIZE];
+    uint8_t aes_ciphertxt[AES_BUF_SIZE];
+
+    /* get random values for aes_key and aes_iv */
+    srand(time(NULL));
+    for (int i = 0; i < AES_KEY_SIZE; i++) {
+        aes_key[i] = (uint8_t)rand_lim(255);
+    }
+    for (int i = 0; i < AES_BLOCK_SIZE; i++) {
+        aes_iv[i] = (uint8_t)rand_lim(255);
+    }
+
+    if (cipher_init(&cipher_ctx, CIPHER_AES_128, aes_key, AES_KEY_SIZE) < 0) {
+        printf("ERROR Cipher init failed!\n");
+        return -1;
+    }
+
+    /*
      *  set up temp file with inner signature and metadata
      */
     tmp_file = fopen("tmp_file", "w+");
@@ -293,13 +333,31 @@ int main(int argc, char *argv[])
     /*
      *  encrypt the binary data and append to temp file
      */
-    // TODO_JB: generate random aes_iv!
+    uint8_t iv[AES_BLOCK_SIZE];
+    memcpy(iv, aes_iv, AES_BLOCK_SIZE);     /* make local copy of IV */
 
     fseek(slot_bin, OTA_FW_METADATA_SPACE, SEEK_SET);
-    while ((bytes_read = fread(firmware_buffer, 1, sizeof(firmware_buffer), slot_bin))) {
-        // TODO_JB: use crypto_stream, write to tmp_file
+    while ((bytes_read = fread(aes_read_buf, 1, sizeof(aes_read_buf), slot_bin))) {
+        /* fill read buffer to next factor of AES_BLOCK_SIZE */
+        if ((bytes_read % AES_BLOCK_SIZE) > 0) {
+            for (int i = 0; i < (AES_BLOCK_SIZE - (bytes_read % AES_BLOCK_SIZE)); i++) {
+                aes_read_buf[bytes_read + i] = 0x00;
+            }
+            bytes_read = bytes_read + (AES_BLOCK_SIZE - (bytes_read % AES_BLOCK_SIZE));
+        }
 
-        fwrite(firmware_buffer, bytes_read, 1, tmp_file); // TODO_JB: dummy only
+        /* encrypt a section of the binary */
+        if (cipher_encrypt_cbc(&cipher_ctx, iv, aes_read_buf, bytes_read, aes_ciphertxt) < 0) {
+            printf("ERROR: Cipher encryption failed!\n");
+            return -1;
+        }
+        /* manually set iv to last output block, because of silly CBC interface */
+        for (int i = 0; i < AES_BLOCK_SIZE; i++) {
+            iv[i] = aes_ciphertxt[AES_BUF_SIZE - AES_BLOCK_SIZE + i];
+        }
+
+        /* write encrypted binary to tmp_file */
+        fwrite(aes_ciphertxt, bytes_read, 1, tmp_file);
     }
 
     /*
@@ -314,10 +372,11 @@ int main(int argc, char *argv[])
     }
     sha256_final(&sha256_ctx, sha256_hash);
 
-    /* encrypt the hash and aes_iv with crypto_box */
+    /* encrypt the hash, aes_iv and aes_key with crypto_box */
     memset(m, 0, crypto_box_ZEROBYTES);
     memcpy(m + crypto_box_ZEROBYTES, sha256_hash, SHA256_DIGEST_LENGTH);
     memcpy(m + crypto_box_ZEROBYTES + SHA256_DIGEST_LENGTH, aes_iv, AES_BLOCK_SIZE);
+    memcpy(m + crypto_box_ZEROBYTES + SHA256_DIGEST_LENGTH + AES_BLOCK_SIZE, aes_key, AES_KEY_SIZE);
 
     crypto_box(file_signature, m, OTA_FILE_SIGN_LEN, sign_nonce, firmware_pkey, server_skey);
 

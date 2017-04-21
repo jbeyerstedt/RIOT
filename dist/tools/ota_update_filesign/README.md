@@ -48,3 +48,13 @@ The following constants are needed:
 - OTA_FW_METADATA_SPACE
 - OTA_FW_SIGN_SPACE
 - OTA_FILE_SIGN_SPACE
+
+## Notes for Use in Mass Production
+This tool currently uses the C time interface for seeding the `rand()` PRNG.
+This will lead to the same seed, if this tool is called multiple times in the
+same second, which will be bad for the quality of the AES encryption used in
+the update file.
+
+So it is recommended to exchange the random number generator used to generate
+the AES key and initialization vector by a better source of entropy. But this
+would be an operating system dependent solution like `/dev/uramdom` in linux.
