@@ -23,6 +23,8 @@
 
 #include "ota_file.h"
 
+#define OTA_CONTINUE_INSTALL    (2)     /* status code for interrupted update */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -30,21 +32,24 @@ extern "C" {
 /**
  * @brief      Send request to update server, if an update is available
  *
- * @return     1 if new firmware available, 0 if not or error code
+ * @return     1 if new firmware available, 0 if not, -1 on error or
+ *             OTA_CONTINUE_INSTALL if an interrupted update is detected
  */
 int ota_updater_request_update(void);
 
 /**
- * @brief      Download the requested update file
+ * @brief      Download the requested update file.
+ *             Call ota_updater_request_update() first!
  *
- * @return     0 on success or error code
+ * @return     0 on success, -1 on error or
+ *             OTA_CONTINUE_INSTALL if an interrupted update is detected
  */
 int ota_updater_download(void);
 
 /**
  * @brief      Decrypt and install the downloaded update file
  *
- * @return     0 on success or error code
+ * @return     0 on success or -1 on error
  */
 int ota_updater_install(void);
 

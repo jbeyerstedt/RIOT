@@ -84,7 +84,7 @@ static void int_flash_read(uint8_t *data_buffer, uint32_t address, uint32_t coun
  * @param[out] *fw_metadata         Pointer to the FW_metadata_t struct where
  *                                  the metadata is to be written.
  *
- * @return     0 on success or error code
+ * @return     0 on success
  */
 int ota_slots_get_int_metadata(uint32_t fw_address, OTA_FW_metadata_t *fw_metadata)
 {
@@ -98,7 +98,7 @@ int ota_slots_get_int_metadata(uint32_t fw_address, OTA_FW_metadata_t *fw_metada
 
 /**
  * @brief      Get the firmware signature (inner signature) of the given
- *             firmware slot.
+ *             FW slot.
  *
  * @param[in]  fw_slot              The FW slot to get the signature from.
  *
@@ -113,7 +113,6 @@ uint32_t ota_slots_get_fw_signature_addr(uint8_t fw_slot)
 
 void ota_slots_print_metadata(OTA_FW_metadata_t *metadata)
 {
-    printf("Firmware metadata dump:\n");
     printf("Firmware HW ID: ");
     for (unsigned long i = 0; i < sizeof(metadata->hw_id); i++) {
         printf("%02x ", metadata->hw_id[i]);
@@ -130,6 +129,29 @@ void ota_slots_print_metadata(OTA_FW_metadata_t *metadata)
     printf("\n");
 }
 
+void ota_slots_print_available_slots(void)
+{
+    printf("[ota_slots] INFO available fw slots are:\n");
+    /* Iterate through each of the MAX_FW_SLOTS internal slots. */
+    for (int slot = 1; slot <= MAX_FW_SLOTS; slot++) {
+        /* Get the metadata of the current FW slot. */
+        OTA_FW_metadata_t fw_slot_metadata;
+
+        printf("[ota_slots] INFO slot %i:\n", slot);
+        if (ota_slots_get_int_slot_metadata(slot, &fw_slot_metadata) == 0) {
+            ota_slots_print_metadata(&fw_slot_metadata);
+        }
+        else {
+            printf("[ota_slots] ERROR cannot get slot metadata.\n");
+        }
+
+        /* Is this slot populated? If not, print message. */
+        if (ota_slots_validate_metadata(&fw_slot_metadata) != 0) {
+            printf("[ota_slots] INFO slot %i is empty\n", slot);
+        }
+    }
+}
+
 int ota_slots_validate_int_slot(uint8_t fw_slot)
 {
     OTA_FW_metadata_t fw_metadata;
@@ -144,7 +166,7 @@ int ota_slots_validate_int_slot(uint8_t fw_slot)
 
     /* Determine the external flash address corresponding to the FW slot */
     if (fw_slot > MAX_FW_SLOTS || fw_slot == 0) {
-        printf("[ota_slots] FW slot not valid, should be <= %d and > 0\n",
+        printf("[ota_slots] ERROR FW slot not valid, should be <= %d and > 0\n",
                MAX_FW_SLOTS);
         return -1;
     }
@@ -156,7 +178,7 @@ int ota_slots_validate_int_slot(uint8_t fw_slot)
         printf("[ota_slots] ERROR cannot get slot metadata.\n");
     }
 
-    printf("Validating slot %d at 0x%lx \n", fw_slot, fw_image_address);
+    DEBUG("[ota_slots] INFO validating slot %d at 0x%lx \n", fw_slot, fw_image_address);
 
     /* check magic number first */
     if (OTA_FW_META_MAGIC != fw_metadata.magic) {
@@ -196,11 +218,11 @@ int ota_slots_validate_int_slot(uint8_t fw_slot)
 
     int res = crypto_box_open(sign_hash, fw_signature, OTA_FW_SIGN_LEN, n, server_pkey, firmware_skey);
     if (res) {
-        printf("[ota_slots] ERROR Decryption failed.\n");
+        printf("[ota_slots] ERROR decryption of crypto_box failed.\n");
         return -1;
     }
     else {
-        printf("Decryption successful! verifying...\n");
+        DEBUG("[ota_file] crypto_box decryption successful! verifying...\n");
         for (int i = 0; i < SHA256_DIGEST_LENGTH; i++) {
             if (hash[i] != (sign_hash[i + crypto_box_ZEROBYTES])) {
                 printf("[ota_slots] ERROR incorrect decrypted hash!\n");
@@ -209,7 +231,7 @@ int ota_slots_validate_int_slot(uint8_t fw_slot)
         }
     }
 
-    printf("[ota_slots] FW slot %i successfully validated!\n", fw_slot);
+    printf("[ota_slots] INFO FW slot %i successfully validated!\n", fw_slot);
 
     return 0;
 }
@@ -218,9 +240,9 @@ int ota_slots_get_int_slot_metadata(uint8_t fw_slot, OTA_FW_metadata_t *fw_slot_
 {
     uint32_t slot_addr;
 
-    DEBUG("[ota_slots] Getting internal FW slot %d metadata\n", fw_slot);
+    DEBUG("[ota_slots] INFO getting internal FW slot %d metadata\n", fw_slot);
     if (fw_slot > MAX_FW_SLOTS || fw_slot == 0) {
-        printf("[ota_slots] FW slot not valid, should be <= %d and > 0\n",
+        printf("[ota_slots] ERROR FW slot not valid, should be <= %d and > 0\n",
                MAX_FW_SLOTS);
         return -1;
     }
@@ -285,7 +307,9 @@ int ota_slots_find_matching_int_slot(uint16_t version)
         /* Get the metadata of the current FW slot. */
         OTA_FW_metadata_t fw_slot_metadata;
         if (ota_slots_get_int_slot_metadata(slot, &fw_slot_metadata) == 0) {
+#if ENABLE_DEBUG == 1
             ota_slots_print_metadata(&fw_slot_metadata);
+#endif
         }
         else {
             printf("[ota_slots] ERROR cannot get slot metadata.\n");
@@ -304,10 +328,10 @@ int ota_slots_find_matching_int_slot(uint16_t version)
     }
 
     if (matching_slot == -1) {
-        printf("[ota_slots] No FW slot matches Firmware v%i\n", version);
+        printf("[ota_slots] INFO no FW slot matches Firmware v%i\n", version);
     }
     else {
-        printf("[ota_slots] FW slot #%i matches Firmware v%i\n", matching_slot,
+        printf("[ota_slots] INFO FW slot #%i matches Firmware v%i\n", matching_slot,
                version);
     }
 
@@ -323,7 +347,9 @@ int ota_slots_find_empty_int_slot(void)
         OTA_FW_metadata_t fw_slot_metadata;
 
         if (ota_slots_get_int_slot_metadata(slot, &fw_slot_metadata) == 0) {
+#if ENABLE_DEBUG == 1
             ota_slots_print_metadata(&fw_slot_metadata);
+#endif
         }
         else {
             printf("[ota_slots] ERROR cannot get slot metadata.\n");
@@ -335,8 +361,8 @@ int ota_slots_find_empty_int_slot(void)
         }
     }
 
-    printf("[ota_slots] Could not find any empty FW slots!"
-           "\nSearching for oldest FW slot instead...\n");
+    DEBUG("[ota_slots] INFO Could not find any empty FW slots!"
+          "\nSearching for oldest FW slot instead...\n");
     /*
      * If execution goes this far, no empty slot was found. Now, we look for
      * the oldest FW slot instead.
@@ -350,7 +376,7 @@ int ota_slots_find_oldest_int_image(void)
     int oldest_fw_slot = 0;
     uint16_t oldest_firmware_version = 0;
 
-    printf("[ota_slots] Finding oldest FW slot, availabe slots are:\n");
+    DEBUG("[ota_slots] INFO Finding oldest FW slot, availabe slots are:\n");
 
     /* Iterate through each of the MAX_FW_SLOTS internal slots. */
     for (int slot = 1; slot <= MAX_FW_SLOTS; slot++) {
@@ -358,7 +384,9 @@ int ota_slots_find_oldest_int_image(void)
         OTA_FW_metadata_t fw_slot_metadata;
 
         if (ota_slots_get_int_slot_metadata(slot, &fw_slot_metadata) == 0) {
+#if ENABLE_DEBUG == 1
             ota_slots_print_metadata(&fw_slot_metadata);
+#endif
         }
         else {
             printf("[ota_slots] ERROR cannot get slot metadata.\n");
@@ -382,8 +410,8 @@ int ota_slots_find_oldest_int_image(void)
         }
     }
 
-    printf("[ota_slots] Oldest FW slot: #%d; Firmware v%d\n", oldest_fw_slot,
-           oldest_firmware_version);
+    DEBUG("[ota_slots] INFO oldest FW slot: #%d; Firmware v%d\n", oldest_fw_slot,
+          oldest_firmware_version);
 
     return oldest_fw_slot;
 }
@@ -394,7 +422,7 @@ int ota_slots_find_newest_int_image(void)
     int newest_fw_slot = 0;
     uint16_t newest_firmware_version = 0;
 
-    printf("[ota_slots] Finding newest FW slot, availabe slots are:\n");
+    DEBUG("[ota_slots] INFO finding newest FW slot, availabe slots are:\n");
 
     /* Iterate through each of the MAX_FW_SLOTS. */
     for (int slot = 1; slot <= MAX_FW_SLOTS; slot++) {
@@ -402,7 +430,9 @@ int ota_slots_find_newest_int_image(void)
         OTA_FW_metadata_t fw_slot_metadata;
 
         if (ota_slots_get_int_slot_metadata(slot, &fw_slot_metadata) == 0) {
+#if ENABLE_DEBUG == 1
             ota_slots_print_metadata(&fw_slot_metadata);
+#endif
         }
         else {
             printf("[ota_slots] ERROR cannot get slot metadata.\n");
@@ -420,8 +450,8 @@ int ota_slots_find_newest_int_image(void)
         }
     }
 
-    printf("Newest FW slot: #%d; Firmware v%d\n", newest_fw_slot,
-           newest_firmware_version);
+    DEBUG("[ota_slots] INFO newest FW slot: #%d; Firmware v%d\n", newest_fw_slot,
+          newest_firmware_version);
 
     return newest_fw_slot;
 }
@@ -434,7 +464,7 @@ int ota_slots_erase_int_image(uint8_t fw_slot)
     uint8_t slot_page;
 
     if (fw_slot > MAX_FW_SLOTS || fw_slot == 0) {
-        printf("[ota_slots] FW slot not valid, should be <= %d and > 0\n",
+        printf("[ota_slots] ERROR FW slot not valid, should be <= %d and > 0\n",
                MAX_FW_SLOTS);
         return -1;
     }
@@ -442,11 +472,11 @@ int ota_slots_erase_int_image(uint8_t fw_slot)
     fw_image_base_address = ota_slots_get_slot_address(fw_slot);
 
 #if !defined(FLASH_SECTORS)
-    printf("[ota_slots] Erasing FW slot %u [%#lx, %#lx]...\n", fw_slot,
+    printf("[ota_slots] INFO erasing FW slot %u [%#lx, %#lx]...\n", fw_slot,
            fw_image_base_address,
            fw_image_base_address + (FW_SLOT_PAGES * FLASHPAGE_SIZE) - 1);
 #else
-    printf("[ota_slots] Erasing FW slot %u [%#lx, %#lx]...\n", fw_slot,
+    printf("[ota_slots] INFO erasing FW slot %u [%#lx, %#lx]...\n", fw_slot,
            fw_image_base_address,
            fw_image_base_address + get_slot_size(fw_slot) - 1);
 #endif
@@ -456,18 +486,18 @@ int ota_slots_erase_int_image(uint8_t fw_slot)
     /* Erase each page in the FW internal slot! */
 #if !defined(FLASH_SECTORS)
     for (int page = slot_page; page < slot_page + FW_SLOT_PAGES; page++) {
-        DEBUG("[ota_slots] Erasing page %d\n", page);
+        DEBUG("[ota_slots] INFO erasing page %d\n", page);
         flashpage_write(page, NULL);
     }
 #else
     int slot_last_page = flashsector_sector((void *)(fw_image_base_address + get_slot_size(fw_slot) - 1));
     for (int sector = slot_page; sector <= slot_last_page; sector++) {
-        DEBUG("[ota_slots] Erasing sector %d\n", page);
+        DEBUG("[ota_slots] INFO erasing sector %d\n", page);
         flashsector_write(sector, NULL, 0);
     }
 #endif
 
-    printf("[ota_slots] Erase successful\n");
+    printf("[ota_slots] INFO erase successful\n");
 
     return 0;
 }

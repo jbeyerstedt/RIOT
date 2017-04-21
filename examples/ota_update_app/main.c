@@ -51,7 +51,7 @@ int ota_reboot_cmd(int argc, char **argv)
 
 int view_slots_cmd(int argc, char **argv)
 {
-    ota_slots_find_oldest_int_image();
+    ota_slots_print_available_slots();
     return 0;
 }
 
@@ -72,7 +72,6 @@ int main(void)
 
     OTA_FW_metadata_t slot_metadata;
     ota_slots_get_int_slot_metadata(FW_SLOT, &slot_metadata);
-
     printf("RIOT OTA update module example, fw version %d\n", slot_metadata.fw_vers);
 
     /* start shell */

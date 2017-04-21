@@ -73,12 +73,12 @@ typedef struct OTA_File_header {
  * @param[in]  file_address         The memory address, where the update file is
  *                                  located.
  *
- * @return     0 on success or error code
+ * @return     0 on success, 1 for an invalid signature or -1 on error
  */
 int ota_file_validate_file(uint32_t file_address);
 
 /**
- * @brief      Decrypt and write an update file to an internal firmware slot.
+ * @brief      Decrypt and write an update file to an internal FW slot.
  *             ota_file_validate_file() must be called before this function!
  *             This function erases the specified slot.
  *
@@ -87,7 +87,7 @@ int ota_file_validate_file(uint32_t file_address);
  * @param[in]  fw_slot              The FW slot index where the update file
  *                                  should be extracted to.
  *
- * @return     0 on success or error code
+ * @return     0 on success or -1 on error
  */
 int ota_file_write_image(uint32_t file_address, uint8_t fw_slot);
 

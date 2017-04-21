@@ -34,7 +34,7 @@ uint8_t is_update_availabe = 0;
 /**
  * @brief      Validate the OTA Update File
  *
- * @return     0 on success or error code
+ * @return     0 on success, 1 for an invalid signature or -1 on error
  */
 int ota_updater_validate_file(void)
 {
@@ -44,7 +44,7 @@ int ota_updater_validate_file(void)
 /**
  * @brief      Decrypt the update file and write to a flash slot
  *
- * @return     0 on success or error code
+ * @return     0 on success or -1 on error
  */
 int ota_updater_flash_write(void)
 {
@@ -53,44 +53,54 @@ int ota_updater_flash_write(void)
     uint8_t fw_slot = ota_slots_find_empty_int_slot();
 
     if (0 == fw_slot) {
-        printf("[ota_updater] ERROR getting oldest firmware slot\n");
+        printf("[ota_updater] ERROR getting oldest FW slot\n");
         return -1;
     }
 
     /* check if update file is suitable for selected slot */
     if (get_slot_address(fw_slot) != (file_header->fw_header.fw_metadata.fw_base_addr - OTA_VTOR_ALIGN)) {
-        printf("[ota_updater] INFO Update File does not suit the free firmware slot\n");
+        printf("[ota_updater] ERROR update file does not suit the free FW slot\n");
         return -1;
     }
 
+    printf("[ota_updater] INFO successfully found an empty slot (or simply the oldest available)\n");
     return ota_file_write_image(file_address, fw_slot);
 }
 
 // TODO_JB_2: test
 int ota_updater_request_update(void)
 {
+    printf("[ota_updater] INFO requesting update\n");
+
     // TODO_JB_2: implement some networking protocol to communicate with the server
     // TODO_JB_2: return 1 if new firmware available, 0 if not or error code
-    return 1;
+
+    return 1;                           // TODO_JB: only used as dummy
 }
 
 // TODO_JB_2: test
 int ota_updater_download(void)
 {
-    // TODO_JB_2: download the file and store to OTA_FILE_SLOT
+    printf("[ota_updater] INFO downloading update\n");
+
     return 0;
 }
 
 int ota_updater_install(void)
 {
+    printf("[ota_updater] INFO starting installation of update file\n");
+
+    printf("[ota_updater] INFO validating signature of update file\n");
     if (ota_updater_validate_file() != 0) {
         return -1;
     }
 
+    printf("[ota_updater] INFO get an empty slot and install update\n");
     return ota_updater_flash_write();
 }
 
 void ota_updater_reboot(void)
 {
+    printf("[ota_updater] INFO rebooting ...\n");
     pm_reboot();
 }

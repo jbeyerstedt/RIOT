@@ -74,17 +74,17 @@ int ota_file_validate_file(uint32_t file_address)
 
     /* check magic numbers first */
     if ((file_header->magic_h != (uint32_t)OTA_FW_FILE_MAGIC_H) || (file_header->magic_l != (uint32_t)OTA_FW_FILE_MAGIC_L)) {
-        return -1;
+        return 1;
     }
     if (OTA_FW_META_MAGIC != fw_metadata->magic) {
-        return -1;
+        return 1;
     }
 
     /* check, if the HW_ID of the image is suitable */
     uint64_t hw_id = HW_ID;
     for (int i = 0; i < sizeof(fw_metadata->hw_id); i++) {
         if ((uint8_t)(hw_id >> (i * 8)) != fw_metadata->hw_id[i]) {
-            return -1;
+            return 1;
         }
     }
 
@@ -112,20 +112,20 @@ int ota_file_validate_file(uint32_t file_address)
 
     int res = crypto_box_open(sign_hash, fw_signature, OTA_FILE_SIGN_LEN, n, server_pkey, firmware_skey);
     if (res) {
-        printf("[ota_file] ERROR Decryption failed.\n");
+        printf("[ota_file] ERROR decryption failed.\n");
         return -1;
     }
     else {
-        DEBUG("Decryption successful! verifying...\n");
+        DEBUG("[ota_file] crypto_box decryption successful! verifying...\n");
         for (int i = 0; i < SHA256_DIGEST_LENGTH; i++) {
             if (hash[i] != (sign_hash[i + crypto_box_ZEROBYTES])) {
-                printf("[ota_file] ERROR incorrect decrypted hash!\n");
-                return -1;
+                printf("[ota_file] INFO incorrect decrypted hash!\n");
+                return 1;
             }
         }
     }
 
-    printf("[ota_file] Update file successfully validated\n");
+    printf("[ota_file] INFO update file successfully validated\n");
 
     /* copy aes_iv and aes_key from signature */
     for (int i = 0; i < sizeof(aes_iv); i++) {
@@ -150,22 +150,22 @@ int ota_file_write_image(uint32_t file_address, uint8_t fw_slot)
     cipher_t cipher_ctx;
 
     if (cipher_init(&cipher_ctx, CIPHER_AES_128, aes_key, AES_KEY_SIZE) < 0) {
-        printf("ERROR Cipher init failed!\n");
+        printf("[ota_file] ERROR cipher init failed!\n");
         return -1;
     }
 
-    printf("[ota_file] Writing update file (FW vers. %d) to FW slot %d\n",
+    printf("[ota_file] INFO writing update file (FW vers. %d) to FW slot %d\n",
            file_header->fw_header.fw_metadata.fw_vers, fw_slot);
 
     /* check some parameters */
     if (fw_slot > MAX_FW_SLOTS || fw_slot == 0) {
-        printf("[ota_slots] FW slot not valid, should be <= %d and > 0\n",
+        printf("[ota_slots] ERROR FW slot not valid, should be <= %d and > 0\n",
                MAX_FW_SLOTS);
         return -1;
     }
 
     if (0 == is_aeskey_set) {
-        printf("[ota_slots] call ota_file_validate_file() first!");
+        printf("[ota_slots] ERROR call ota_file_validate_file() first!");
         return -1;
     }
 
@@ -175,14 +175,16 @@ int ota_file_write_image(uint32_t file_address, uint8_t fw_slot)
     /* where should we write the extractes update file to */
     fw_slot_base_addr = ota_slots_get_slot_address(fw_slot);
 
-    /** erase all flash sectors of the firmware slot **/
+    /** erase all flash sectors of the FW slot **/
+    DEBUG("[ota_file] INFO start erasing the FW slot\n");
     slot_sector = get_slot_page(fw_slot);
     int slot_last_page = flashsector_sector((void *)(fw_slot_base_addr + get_slot_size(fw_slot) - 1));
     for (int sector = slot_sector; sector <= slot_last_page; sector++) {
         flashsector_write(sector, NULL, 0);
     }
 
-    /** decrypt update file and write to firmware slot **/
+    /** decrypt update file and write to FW slot **/
+    DEBUG("[ota_file] INFO add necessary spacing before the header\n");
     uint32_t slot_write_addr = fw_slot_base_addr;
     uint32_t file_read_addr = file_address + OTA_FW_FILE_MAGIC_LEN; /* skip FILE_MAGIC */
 #if (OTA_VTOR_ALIGN > OTA_FILE_HEADER_SPACE)
@@ -197,18 +199,20 @@ int ota_file_write_image(uint32_t file_address, uint8_t fw_slot)
 #endif
 
     /* copy FILE_HEADER */
+    DEBUG("[ota_file] INFO start copying header information\n");
     flashsector_write_only((void *)slot_write_addr, (void *)file_read_addr, OTA_FILE_HEADER_SPACE);
     slot_write_addr += OTA_FILE_HEADER_SPACE;
     file_read_addr += OTA_FILE_HEADER_SPACE;
 
     /* copy binary */
+    DEBUG("[ota_file] INFO start decrypting and writing binary data\n");
     uint32_t encrypted_size = fw_binary_size + (AES_BLOCK_SIZE - fw_binary_size % AES_BLOCK_SIZE);
     uint32_t binary_sections = encrypted_size / sizeof(buffer);
     uint32_t binary_sections_rest = encrypted_size % sizeof(buffer);
     for (int i = 0; i < binary_sections; i++) {
         /* decrypt a section of the binary to buffer */
         if (cipher_decrypt_cbc(&cipher_ctx, aes_iv, (uint8_t *)file_read_addr, sizeof(buffer), buffer) < 0) {
-            printf("ERROR: Cipher decryption failed!\n");
+            printf("[ota_file] ERROR decryption off binary section failed!\n");
             return -1;
         }
         /* manually set iv to last ciphertext block, because of silly CBC interface */
@@ -225,7 +229,7 @@ int ota_file_write_image(uint32_t file_address, uint8_t fw_slot)
     if (binary_sections_rest != 0) { /* binary_sections_rest will always be % AES_BLOCK_SIZE */
         /* decrypt a section of the binary to buffer */
         if (cipher_decrypt_cbc(&cipher_ctx, aes_iv, (uint8_t *)file_read_addr, binary_sections_rest, buffer) < 0) {
-            printf("ERROR: Cipher decryption failed!\n");
+            printf("[ota_file] ERROR decryption off binary section failed!\n");
             return -1;
         }
         /* omit setting IV for next round, becaue it is not needed any more */
@@ -237,7 +241,7 @@ int ota_file_write_image(uint32_t file_address, uint8_t fw_slot)
         slot_write_addr += binary_sections_rest;
     }
 
-    printf("[ota_file] successfully wrote update file\n");
+    printf("[ota_file] INFO successfully wrote update file to FW slot %d\n", fw_slot);
 
     return 0;
 }

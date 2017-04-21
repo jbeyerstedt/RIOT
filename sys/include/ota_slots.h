@@ -126,11 +126,17 @@ extern const unsigned char firmware_skey[];
 void ota_slots_print_metadata(OTA_FW_metadata_t *metadata);
 
 /**
+ * @brief      Print formatted FW metadata of all slots to STDIO.
+ *
+ */
+void ota_slots_print_available_slots(void);
+
+/**
  * @brief      Validate internal FW slot as a secure firmware
  *
  * @param[in]  fw_slot              The FW slot to be validated.
  *
- * @return     0 on success or error code
+ * @return     0 on success or -1 on error
  */
 int ota_slots_validate_int_slot(uint8_t fw_slot);
 
@@ -142,7 +148,7 @@ int ota_slots_validate_int_slot(uint8_t fw_slot);
  * @param[out] *fw_slot_metadata    Pointer to the FW_metadata_t struct where
  *                                  the metadata is to be written.
  *
- * @return     0 on success or error code
+ * @return     0 on success or -1 on error
  */
 int ota_slots_get_int_slot_metadata(uint8_t fw_slot,
                                     OTA_FW_metadata_t *fw_slot_metadata);
@@ -153,7 +159,7 @@ int ota_slots_get_int_slot_metadata(uint8_t fw_slot,
  * @param[in]  fw_slot              The FW slot to get the address.
  *
  *
- * @return     flash address of the given firmware slot
+ * @return     flash address of the given FW slot
  */
 uint32_t ota_slots_get_slot_address(uint8_t fw_slot);
 
@@ -163,7 +169,7 @@ uint32_t ota_slots_get_slot_address(uint8_t fw_slot);
  * @param[in]  fw_slot              The FW slot to get the page.
  *
  *
- * @return     starting flash page/sector of the given firmware slot
+ * @return     starting flash page/sector of the given FW slot
  */
 uint32_t ota_slots_get_slot_page(uint8_t fw_slot);
 
@@ -185,8 +191,8 @@ int ota_slots_validate_metadata(OTA_FW_metadata_t *metadata);
  *
  * @param[in]  version              FW slot version.
  *
- * @return     The FW slot index of the matching FW slot. Return -1 in the event
- *             of no match.
+ * @return     The FW slot index of the matching FW slot.
+ *             Returns -1 in the event of no match.
  */
 int ota_slots_find_matching_int_slot(uint16_t version);
 
@@ -220,7 +226,7 @@ int ota_slots_find_newest_int_image(void);
  * @param[in]  fw_slot              The FW slot index of the firmware image to
  *                                  be erased.
  *
- * @return     0 on success, else -1 or error code
+ * @return     0 on success, -1 on error
  */
 int ota_slots_erase_int_image(uint8_t fw_slot);
 

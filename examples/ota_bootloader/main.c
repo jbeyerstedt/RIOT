@@ -32,6 +32,9 @@
 #endif
 #include "cpu_conf.h"
 
+#define ENABLE_DEBUG (0)
+#include "debug.h"
+
 void safe_state(void)
 {
     printf("No bootable image found, go to safe state");
@@ -56,6 +59,8 @@ int main(void)
 
     (void) puts("Welcome to RIOT bootloader!\n");
 
+    ota_slots_print_available_slots();
+
     /** first assume, that the newest slot is good **/
     boot_slot = ota_slots_find_newest_int_image();
     if (0 == boot_slot) {
@@ -70,6 +75,7 @@ int main(void)
         if (watchdog_dummy == 0) {                          /* watchdog ok, normal behaviour */
             printf("Watchdog ok\n");
             /* check signature before booting */
+            printf("validating signature of slot %i\n", boot_slot);
             if (ota_slots_validate_int_slot(boot_slot) == 0) {
                 boot_firmware_slot(boot_slot);
             }
@@ -89,6 +95,7 @@ int main(void)
         if (watchdog_dummy == 0) {  /* watchdog ok, try normal behaviour */
             printf("Watchdog ok\n");
             /* check signature of newest slot */
+            printf("validating signature of slot %i\n", boot_slot);
             if (ota_slots_validate_int_slot(boot_slot) == 0) {
                 boot_firmware_slot(boot_slot);
             }
@@ -104,8 +111,8 @@ int main(void)
                 uint16_t file_fw_vers = file_header->fw_header.fw_metadata.fw_vers;
                 uint16_t slot_fw_vers = slot_metadata.fw_vers;
                 if (file_fw_vers <= slot_fw_vers) {
-                    /* delete newest firmware slot */
-                    printf("erasing newest firmware slot\n");
+                    /* delete newest FW slot */
+                    printf("erasing newest FW slot\n");
                     flashsector_write(get_slot_page(boot_slot), NULL, 0);
                 }
 
