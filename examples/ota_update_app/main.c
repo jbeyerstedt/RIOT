@@ -28,24 +28,29 @@
 #define MAIN_QUEUE_SIZE     (8)
 static msg_t _main_msg_queue[MAIN_QUEUE_SIZE];
 
-int ota_request_cmd(int argc, char **argv) {
+int ota_request_cmd(int argc, char **argv)
+{
     return ota_updater_request_update();
 }
 
-int ota_download_cmd(int argc, char **argv) {
+int ota_download_cmd(int argc, char **argv)
+{
     return ota_updater_download();
 }
 
-int ota_install_cmd(int argc, char **argv) {
+int ota_install_cmd(int argc, char **argv)
+{
     return ota_updater_install();
 }
 
-int ota_reboot_cmd(int argc, char **argv) {
+int ota_reboot_cmd(int argc, char **argv)
+{
     ota_updater_reboot();
     return 0;
 }
 
-int view_slots_cmd(int argc, char **argv) {
+int view_slots_cmd(int argc, char **argv)
+{
     ota_slots_find_oldest_int_image();
     return 0;
 }
@@ -64,7 +69,11 @@ int main(void)
     /* we need a message queue for the thread running the shell in order to
      * receive potentially fast incoming networking packets */
     msg_init_queue(_main_msg_queue, MAIN_QUEUE_SIZE);
-    puts("RIOT OTA update module example");
+
+    OTA_FW_metadata_t slot_metadata;
+    ota_slots_get_int_slot_metadata(FW_SLOT, &slot_metadata);
+
+    printf("RIOT OTA update module example, fw version %d\n", slot_metadata.fw_vers);
 
     /* start shell */
     puts("All up, running the shell now");
