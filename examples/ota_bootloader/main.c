@@ -105,15 +105,18 @@ int main(void)
                 /* compare fw versions of the update file and the newest slot */
                 printf("trying to check, if the cause was an incomplete installation\n");
                 OTA_File_header_t *file_header = (OTA_File_header_t *)(OTA_FILE_SLOT);
-                OTA_FW_metadata_t slot_metadata;
-                ota_slots_get_int_slot_metadata(boot_slot, &slot_metadata);
+                /* first check if a file is available */
+                if ((file_header->magic_h == (uint32_t)OTA_FW_FILE_MAGIC_H) && (file_header->magic_l == (uint32_t)OTA_FW_FILE_MAGIC_L)) {
+                    OTA_FW_metadata_t slot_metadata;
+                    ota_slots_get_int_slot_metadata(boot_slot, &slot_metadata);
 
-                uint16_t file_fw_vers = file_header->fw_header.fw_metadata.fw_vers;
-                uint16_t slot_fw_vers = slot_metadata.fw_vers;
-                if (file_fw_vers <= slot_fw_vers) {
-                    /* delete newest FW slot */
-                    printf("erasing newest FW slot\n");
-                    flashsector_write(get_slot_page(boot_slot), NULL, 0);
+                    uint16_t file_fw_vers = file_header->fw_header.fw_metadata.fw_vers;
+                    uint16_t slot_fw_vers = slot_metadata.fw_vers;
+                    if (file_fw_vers <= slot_fw_vers) {
+                        /* delete newest FW slot */
+                        printf("erasing newest FW slot\n");
+                        flashsector_write(get_slot_page(boot_slot), NULL, 0);
+                    }
                 }
 
                 /* continue after this if-else-statement */
@@ -125,15 +128,18 @@ int main(void)
             /* compare fw versions of the update file and the newest slot */
             printf("trying to check, if the cause was an incomplete installation\n");
             OTA_File_header_t *file_header = (OTA_File_header_t *)(OTA_FILE_SLOT);
-            OTA_FW_metadata_t slot_metadata;
-            ota_slots_get_int_slot_metadata(boot_slot, &slot_metadata);
+            /* first check if a file is available */
+            if ((file_header->magic_h == (uint32_t)OTA_FW_FILE_MAGIC_H) && (file_header->magic_l == (uint32_t)OTA_FW_FILE_MAGIC_L)) {
+                OTA_FW_metadata_t slot_metadata;
+                ota_slots_get_int_slot_metadata(boot_slot, &slot_metadata);
 
-            uint16_t file_fw_vers = file_header->fw_header.fw_metadata.fw_vers;
-            uint16_t slot_fw_vers = slot_metadata.fw_vers;
-            if (file_fw_vers <= slot_fw_vers) {
-                /* delete the malicious update file */
-                printf("erasing update file with non executable code\n");
-                flashsector_write(OTA_FILE_SLOT_START_SECTOR, NULL, 0);
+                uint16_t file_fw_vers = file_header->fw_header.fw_metadata.fw_vers;
+                uint16_t slot_fw_vers = slot_metadata.fw_vers;
+                if (file_fw_vers <= slot_fw_vers) {
+                    /* delete the malicious update file */
+                    printf("erasing update file with non executable code\n");
+                    flashsector_write(OTA_FILE_SLOT_START_SECTOR, NULL, 0);
+                }
             }
 
             /* continue after this if-else-statement */
