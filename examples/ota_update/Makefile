@@ -22,12 +22,12 @@ OTA_FILE_HEADER_SPACE = 0x100   # OTA_FW_METADATA_SPACE + OTA_FW_SIGN_SPACE + OT
 OTA_VTOR_ALIGN = 0x200          # only for VTOR alignment
 
 # Define for which hardware id / article id this firmware should work
-HW_ID = 0xabc0123456789def
+HW_ID ?= 0xabc0123456789def
 
 # Define the version number (must be strictly ascending) of this firmware
-FW_VERS = 0x1
+FW_VERS ?= 0x1
 # FW_VERS_2 is used for manual/ testing population of both slots only
-FW_VERS_2 = 0x2
+FW_VERS_2 ?= 0x2
 
 ifdef SECTORS     # parameters for sectored flash
 	# Define the parameters for the FW slot 1
