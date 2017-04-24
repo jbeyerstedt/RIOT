@@ -340,8 +340,10 @@ int main(int argc, char *argv[])
     while ((bytes_read = fread(aes_read_buf, 1, sizeof(aes_read_buf), slot_bin))) {
         /* fill read buffer to next factor of AES_BLOCK_SIZE */
         if ((bytes_read % AES_BLOCK_SIZE) > 0) {
-            for (int i = 0; i < (AES_BLOCK_SIZE - (bytes_read % AES_BLOCK_SIZE)); i++) {
-                aes_read_buf[bytes_read + i] = 0x00;
+            /* use ISO/IEC 9797-1 padding method 2 */
+            aes_read_buf[bytes_read] = 0x80; /* fill with 1 bit "1", rest "0" */
+            for (int i = 1; i < (AES_BLOCK_SIZE - (bytes_read % AES_BLOCK_SIZE)); i++) {
+                aes_read_buf[bytes_read + i] = 0x00; /* fill with "0"-bytes */
             }
             bytes_read = bytes_read + (AES_BLOCK_SIZE - (bytes_read % AES_BLOCK_SIZE));
         }
