@@ -322,7 +322,7 @@ ifeq ($(FW_SLOTS),1)
 	@$(COLOR_ECHO) '${COLOR_RED}This is a build for FW slot $(FW_SLOT).${COLOR_RESET}'
 endif
 ifeq ($(OTA_UPDATE),1)
-	@$(COLOR_ECHO) '${COLOR_RED}This is a OTA update build for FW slot $(FW_SLOT).${COLOR_RESET}'
+	@$(COLOR_ECHO) '${COLOR_RED}This is an OTA update capable build for FW slot $(FW_SLOT) with FW version $(OTA_FW_VERS).${COLOR_RESET}'
 endif
 ifeq ($(BOOTLOADER),1)
 	@$(COLOR_ECHO) '${COLOR_RED}This is a Bootloader build.${COLOR_RESET}'
