@@ -22,11 +22,17 @@
 
 #include "shell.h"
 #include "msg.h"
+#include "thread.h"
+#include "xtimer.h"
 #include "ota_updater.h"
 #include "ota_slots.h"
 
+#include "cpu_conf.h"
+
 #define MAIN_QUEUE_SIZE     (8)
 static msg_t _main_msg_queue[MAIN_QUEUE_SIZE];
+
+char wdg_thread_stack[THREAD_STACKSIZE_MAIN];
 
 int ota_request_cmd(int argc, char **argv)
 {
@@ -70,6 +76,17 @@ static const shell_command_t shell_commands[] = {
     { NULL, NULL, NULL }
 };
 
+void *wdg_thread(void *arg)
+{
+    while (1) {
+        /* reset the watchdog (IWGD) timer */
+        IWDG->KR = 0xAAAA;
+
+        xtimer_usleep(250000);      /* wdg timeout is 512 ms */
+    }
+    return NULL;
+}
+
 int main(void)
 {
     /* we need a message queue for the thread running the shell in order to
@@ -78,7 +95,12 @@ int main(void)
 
     OTA_FW_metadata_t slot_metadata;
     ota_slots_get_int_slot_metadata(FW_SLOT, &slot_metadata);
-    printf("RIOT OTA update module example, fw version %d\n", slot_metadata.fw_vers);
+    printf("RIOT OTA update module example, FW version %d\n", slot_metadata.fw_vers);
+
+    /* add a thread to reset the watchdog periodically */
+    thread_create(wdg_thread_stack, sizeof(wdg_thread_stack),
+                  THREAD_PRIORITY_MAIN - 1, THREAD_CREATE_STACKTEST,
+                  wdg_thread, NULL, "wdg_thread");
 
     /* start shell */
     puts("All up, running the shell now");

@@ -20,6 +20,7 @@ QUIET ?= 1
 
 # Modules to include:
 USEMODULE += shell
+USEMODULE += xtimer
 
 # Use ota_slots module to manage images on ROM
 USEMODULE += ota_slots

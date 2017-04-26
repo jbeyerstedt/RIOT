@@ -37,6 +37,8 @@ USEMODULE += netstats_rpl
 
 USEMODULE += ota_updater
 
+USEMODULE += xtimer
+
 # tweetnacl needs more stack
 CFLAGS += '-DTHREAD_STACKSIZE_MAIN=(THREAD_STACKSIZE_DEFAULT + 3072)'
 
