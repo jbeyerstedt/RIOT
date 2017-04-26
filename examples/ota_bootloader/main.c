@@ -72,7 +72,7 @@ int main(void)
     if (boot_slot == ota_slots_find_oldest_int_image()) {   /* just one slot */
         printf("Only one slot is populated, getting watchdog status\n");
         /* TODO_JB: check real watchdog */
-        if (watchdog_dummy == 0) {                          /* watchdog ok, normal behaviour */
+        if (iwdg_reset_status() == 0) {         /* watchdog ok, normal behaviour */
             printf("Watchdog ok\n");
             /* check signature before booting */
             printf("validating signature of slot %i\n", boot_slot);
@@ -84,15 +84,15 @@ int main(void)
                 safe_state();
             }
         }
-        else {                      /* watchdog was triggered, secondary behaviour */
+        else {                                  /* watchdog was triggered, secondary behaviour */
             printf("Watchdog was triggered\n");
             safe_state();
         }
     }
-    else {                          /* both slots are populetd */
+    else {                                                  /* both slots are populetd */
         printf("Both slots are populated, getting watchdog status\n");
         /* TODO_JB: check real watchdog */
-        if (watchdog_dummy == 0) {  /* watchdog ok, try normal behaviour */
+        if (iwdg_reset_status() == 0) {         /* watchdog ok, try normal behaviour */
             printf("Watchdog ok\n");
             /* check signature of newest slot */
             printf("validating signature of slot %i\n", boot_slot);
@@ -122,7 +122,7 @@ int main(void)
                 /* continue after this if-else-statement */
             }
         }
-        else {                      /* watchdog was triggered, secondary behaviour */
+        else {                                  /* watchdog was triggered, secondary behaviour */
             printf("Watchdog was triggered\n");
 
             /* compare fw versions of the update file and the newest slot */
