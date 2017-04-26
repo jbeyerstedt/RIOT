@@ -101,12 +101,17 @@ updatefiles-prepare: ota_update_app-file-slot1 ota_update_app-file-slot2
 updatefiles-ready: updatefiles-prepare sign-updatefiles
 	@true
 
-sign-updatefiles:
+sign-updatefiles: sign-update-slot1 sign-update-slot2
+	@true
+
+sign-update-slot1:
 	../../dist/tools/ota_update_filesign/bin/./generate-ota_update_file \
 	app_binary-$(HW_ID)-$(FW_VERS)-s1.bin \
 	server_skey firmware_pkey.pub; \
 	mv ota_update_file.bin fw_update-$(HW_ID)-$(FW_VERS)-s1.bin; \
-	rm tmp_file
+	rm tmp_file;
+
+sign-update-slot2:
 	../../dist/tools/ota_update_filesign/bin/./generate-ota_update_file \
 	app_binary-$(HW_ID)-$(FW_VERS)-s2.bin \
 	server_skey firmware_pkey.pub; \
