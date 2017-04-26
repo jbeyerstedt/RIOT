@@ -56,6 +56,19 @@ endif
 OTA_FILE_OFFSET = 0x08060000        # Start at sector 7
 OTA_FILE_LENGTH = 0x20000           # Reserve whole sector 7
 
+
+## some things to make "make term" work
+RIOTBOARD      ?= $(RIOTBASE)/boards
+override RIOTBASE       := $(abspath $(RIOTBASE))
+override RIOTBOARD      := $(abspath $(RIOTBOARD))
+
+ifneq (0,$(shell test -d $(RIOTBOARD)/$(BOARD); echo $$?))
+    $(error The specified board $(BOARD) does not exist.)
+endif
+
+include $(RIOTBOARD)/$(BOARD)/Makefile.include
+
+
 ### TARGETS TO INITIALIZE ALL TOOLS ###
 # compile all necessary tools (dist/tools)
 setup-tools: make-keygen make-metagen make-filesign
@@ -223,6 +236,14 @@ setup-ethos:
 # start ethos communitation
 ethos:
 	../../dist/tools/ethos/ethos tap0 /dev/ttyACM0
+
+# serial terminal (copied from Makefile.include)
+term:
+	@command -v $(TERMPROG) >/dev/null 2>&1 || \
+		{ $(COLOR_ECHO) \
+		'${COLOR_RED}Terminal program $(TERMPROG) not found. Aborting.${COLOR_RESET}'; \
+		exit 1; }
+	$(TERMPROG) $(TERMFLAGS)
 
 ### TARGETS TO CLEAN
 # cleans everything, but leaves the keys
