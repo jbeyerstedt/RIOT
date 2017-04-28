@@ -37,6 +37,7 @@ char wdg_thread_stack[THREAD_STACKSIZE_MAIN];
 int ota_request_cmd(int argc, char **argv)
 {
     int ret_val = ota_updater_request_update();
+
     printf("ota_updater_request_update returned %i\n", ret_val);
     return 0;
 }
@@ -44,6 +45,7 @@ int ota_request_cmd(int argc, char **argv)
 int ota_download_cmd(int argc, char **argv)
 {
     int ret_val = ota_updater_download();
+
     printf("ota_updater_download returned %i\n", ret_val);
     return 0;
 }
@@ -51,6 +53,7 @@ int ota_download_cmd(int argc, char **argv)
 int ota_install_cmd(int argc, char **argv)
 {
     int ret_val = ota_updater_install();
+
     printf("ota_updater_install returned %i\n", ret_val);
     return 0;
 }
@@ -67,12 +70,22 @@ int view_slots_cmd(int argc, char **argv)
     return 0;
 }
 
+int fw_info_cmd(int argc, char **argv)
+{
+    OTA_FW_metadata_t slot_metadata;
+
+    ota_slots_get_int_slot_metadata(FW_SLOT, &slot_metadata);
+    printf("FW version %d, slot %d\n", slot_metadata.fw_vers, FW_SLOT);
+    return 0;
+}
+
 static const shell_command_t shell_commands[] = {
     { "ota_request", "Send request to update server", ota_request_cmd },
     { "ota_download", "Download the requested update", ota_download_cmd },
     { "ota_install", "Install the downloaded update", ota_install_cmd },
     { "ota_reboot", "Reboot device", ota_reboot_cmd },
-    { "view_slots", "View FW Slots", view_slots_cmd },
+    { "view_slots", "View FW slots", view_slots_cmd },
+    { "fw_info", "View FW version and slot number", fw_info_cmd },
     { NULL, NULL, NULL }
 };
 
