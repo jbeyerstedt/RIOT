@@ -62,6 +62,7 @@ int ota_file_validate_file(uint32_t file_address)
 {
     OTA_File_header_t *file_header = (OTA_File_header_t *)(OTA_FILE_SLOT);
     OTA_FW_metadata_t *fw_metadata = &file_header->fw_header.fw_metadata;
+    OTA_FW_metadata_t slot_metadata;
     uint32_t address;
     uint16_t rest;
     sha256_context_t sha256_ctx;
@@ -86,6 +87,12 @@ int ota_file_validate_file(uint32_t file_address)
         if ((uint8_t)(hw_id >> (i * 8)) != fw_metadata->hw_id[i]) {
             return 1;
         }
+    }
+
+    /* check, if the fw_vers is higher then the own fw_vers */
+    ota_slots_get_int_slot_metadata(FW_SLOT, &slot_metadata);
+    if (fw_metadata->fw_vers <= slot_metadata.fw_vers) {
+        return 1;
     }
 
     /** check file signature **/
@@ -184,6 +191,8 @@ int ota_file_write_image(uint32_t file_address, uint8_t fw_slot)
     }
 
     /** decrypt update file and write to FW slot **/
+
+    /* add the correct spacing in front of the file header first */
     DEBUG("[ota_file] INFO add necessary spacing before the header\n");
     uint32_t slot_write_addr = fw_slot_base_addr;
     uint32_t file_read_addr = file_address + OTA_FW_FILE_MAGIC_LEN; /* skip FILE_MAGIC */
