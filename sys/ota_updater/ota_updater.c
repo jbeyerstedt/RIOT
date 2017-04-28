@@ -70,7 +70,7 @@ int ota_updater_flash_write(void)
         return -1;
     }
 
-    printf("[ota_updater] INFO successfully found an empty slot (or simply the oldest available)\n");
+    DEBUG("[ota_updater] INFO successfully found an empty slot (or simply the oldest available)\n");
     return ota_file_write_image(file_address, fw_slot);
 }
 
@@ -127,12 +127,13 @@ int ota_updater_install(void)
 {
     printf("[ota_updater] INFO starting installation of update file\n");
 
-    printf("[ota_updater] INFO validating signature of update file\n");
+    DEBUG("[ota_updater] INFO validating signature of update file\n");
     if (ota_updater_validate_file() != 0) {
+        printf("[ota_updater] ERROR update file is invalid\n");
         return -1;
     }
 
-    printf("[ota_updater] INFO get an empty slot and install update\n");
+    DEBUG("[ota_updater] INFO get an empty slot and install update\n");
     return ota_updater_flash_write();
 }
 
