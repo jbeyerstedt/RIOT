@@ -208,13 +208,14 @@ sign-image-slot2:
 flash-test:
 	OPENOCD_CONFIG=../../boards/$(BOARD)/dist/openocd.cfg \
 	HEXFILE=hex-slotstest.hex \
-	../../dist/tools/openocd/openocd.sh flash
+	../../dist/tools/openocd/openocd.sh flash 2>&1
 
 # flashes the factory-hex
 flash-factory:
 	OPENOCD_CONFIG=../../boards/$(BOARD)/dist/openocd.cfg \
+	OPENOCD_PRE_FLASH_CMDS="-c 'flash erase_sector 0 5 5'" \
 	HEXFILE=hex-factory.hex \
-	../../dist/tools/openocd/openocd.sh flash
+	../../dist/tools/openocd/openocd.sh flash 2>&1
 
 # flashes the update file for slot 1 in the OTA file space
 flash-updatefile-slot1:
@@ -222,7 +223,7 @@ flash-updatefile-slot1:
 	-o hex-updatefile-s1.hex -intel
 	OPENOCD_CONFIG=../../boards/$(BOARD)/dist/openocd.cfg \
 	HEXFILE=hex-updatefile-s1.hex \
-	../../dist/tools/openocd/openocd.sh flash
+	../../dist/tools/openocd/openocd.sh flash 2>&1
 
 # flashes the update file for slot 2 in the OTA file space
 flash-updatefile-slot2:
@@ -230,7 +231,7 @@ flash-updatefile-slot2:
 	-o hex-updatefile-s2.hex -intel
 	OPENOCD_CONFIG=../../boards/$(BOARD)/dist/openocd.cfg \
 	HEXFILE=hex-updatefile-s2.hex \
-	../../dist/tools/openocd/openocd.sh flash
+	../../dist/tools/openocd/openocd.sh flash 2>&1
 
 ### TARGETS FOR ETHOS COMMUNICATION
 # setup tap interface
