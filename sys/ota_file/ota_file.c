@@ -98,7 +98,10 @@ int ota_file_validate_file(uint32_t file_address)
     /** check file signature **/
     /* calculate hash of metadata section and encrypted firmware binary */
     address = (uint32_t)&file_header->fw_header;
-    uint32_t encrypted_size = fw_metadata->size + (AES_BLOCK_SIZE - fw_metadata->size % AES_BLOCK_SIZE);
+    uint32_t encrypted_size = fw_metadata->size;
+    if ((encrypted_size % AES_BLOCK_SIZE) > 0) {
+        encrypted_size += AES_BLOCK_SIZE - fw_metadata->size % AES_BLOCK_SIZE;
+    }
     parts = (encrypted_size + OTA_FW_HEADER_SPACE) / sizeof(buffer);
     rest = (encrypted_size + OTA_FW_HEADER_SPACE) % sizeof(buffer);
     sha256_init(&sha256_ctx);
