@@ -169,13 +169,13 @@ int ota_file_write_image(uint32_t file_address, uint8_t fw_slot)
 
     /* check some parameters */
     if (fw_slot > MAX_FW_SLOTS || fw_slot == 0) {
-        printf("[ota_slots] ERROR FW slot not valid, should be <= %d and > 0\n",
+        printf("[ota_file] ERROR FW slot not valid, should be <= %d and > 0\n",
                MAX_FW_SLOTS);
         return -1;
     }
 
     if (0 == is_aeskey_set) {
-        printf("[ota_slots] ERROR call ota_file_validate_file() first!");
+        printf("[ota_file] ERROR call ota_file_validate_file() first!");
         return -1;
     }
 
