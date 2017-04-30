@@ -25,17 +25,18 @@ def kill_ethos(ethos):
     os.killpg(os.getpgid(ethos.pid), signal.SIGTERM)
 
 
-def do_test():
+def do_test(tty_out):
     ## prepare everything for this test
-    subprocess.call("FW_VERS=0x1 make merge-factory-hex >/dev/null", shell=True)
+    subprocess.call("FW_VERS=0x1 make merge-factory-hex >" + tty_out, shell=True)
 
     print("(Step 1) initial flashing with factory firmware")
     ## flash the devive with factory-hex
-    subprocess.call("FW_VERS=0x1 make flash-factory >/dev/null", shell=True)
+    if subprocess.call("FW_VERS=0x1 make flash-factory >" + tty_out, shell=True):
+        return -1
     time.sleep(1)
 
     ## start ethos console
-    ethos = subprocess.Popen("make ethos 2>/dev/null", stdout=subprocess.PIPE, stdin=subprocess.PIPE, shell=True, preexec_fn=os.setsid)
+    ethos = subprocess.Popen("make ethos 2>" + tty_out, stdout=subprocess.PIPE, stdin=subprocess.PIPE, shell=True, preexec_fn=os.setsid)
     time.sleep(1)
     # wrap p.stdout with a NonBlockingStreamReader object:
     nbsr = NBSR(ethos.stdout)
@@ -79,7 +80,8 @@ def do_test():
 
     print("(Step 2) write update file (fw_vers 2, slot 2) to device and initiate update")
     ## flash the update file
-    subprocess.call("FW_VERS=0x2 make flash-updatefile-slot2 >/dev/null", shell=True)
+    if subprocess.call("FW_VERS=0x2 make flash-updatefile-slot2 >" + tty_out, shell=True):
+        return -1
     time.sleep(1)
 
     ## check running FW version again (after flashing update file)
@@ -140,7 +142,8 @@ def do_test():
 
 
     print("(Step 3) write update file (fw_vers 3, slot 1) to device and initiate update")
-    subprocess.call("FW_VERS=0x3 make flash-updatefile-slot1 >/dev/null", shell=True)
+    if subprocess.call("FW_VERS=0x3 make flash-updatefile-slot1 >" + tty_out, shell=True):
+        return -1
     time.sleep(1)
 
     ## check running FW version again (after flashing update file)
@@ -201,7 +204,8 @@ def do_test():
 
 
     print("(Step 4) write update file (fw_vers 4, slot 2) to device and initiate update")
-    subprocess.call("FW_VERS=0x4 make flash-updatefile-slot2 >/dev/null", shell=True)
+    if subprocess.call("FW_VERS=0x4 make flash-updatefile-slot2 >" + tty_out, shell=True):
+        return -1
     time.sleep(1)
 
     ## check running FW version again (after flashing update file)

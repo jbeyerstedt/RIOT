@@ -26,35 +26,42 @@ def kill_ethos(ethos):
 
 
 ### call first to prepare and setup things
-def prepare():
-    subprocess.call("FW_VERS=0x2 FW_VERS_2=0x3 make merge-test-hex >/dev/null", shell=True)
-
+def prepare(tty_out):
+    subprocess.call("FW_VERS=0x2 FW_VERS_2=0x3 make merge-test-hex >" + tty_out, shell=True)
     # TODO: open ethos interface
+    return 0
 
 
 
 ### Test 2a (update file with invalid file signature)
-def do_part_a():
+def do_part_a(tty_out):
     # TODO: manipulate some bits of the vers 4, slot 1 file
-    print("todo")
+
+    return 0
 
 
 
 ### Test 2b (update file with invalid hw_id)
-def do_part_b():
-    subprocess.call("HW_ID=0xbaadf00dbaadf00d FW_VERS=0x4 make ota_update_app-file-slot1 sign-update-slot1 >/dev/null", shell=True)
-    #subprocess.call("HW_ID=0xbaadf00dbaadf00d FW_VERS=0x4 make flash-updatefile-slot1 >/dev/null", shell=True)
+def do_part_b(tty_out):
+    subprocess.call("HW_ID=0xbaadf00dbaadf00d FW_VERS=0x4 make ota_update_app-file-slot1 sign-update-slot1 >" + tty_out, shell=True)
+    # if subprocess.call("HW_ID=0xbaadf00dbaadf00d FW_VERS=0x4 make flash-updatefile-slot1 >" + tty_out, shell=True):
+    #     return -1
+
+    return 0
 
 
 
 ### Test 2c (update file with lower fw_vers)
-def do_part_c():
-    #subprocess.call("FW_VERS=0x1 make flash-updatefile-slot1 >/dev/null", shell=True)
-    print("todo")
+def do_part_c(tty_out):
+    # if subprocess.call("FW_VERS=0x1 make flash-updatefile-slot1 >" + tty_out, shell=True):
+    #     return -1
+
+    return 0
 
 
 
 ### call last to tidy up afterwards
-def finish():
+def finish(tty_out):
     kill_ethos
     # TODO: delete the "wrong" files
+    return 0
