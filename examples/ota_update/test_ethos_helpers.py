@@ -25,10 +25,6 @@ def ethos_command(nbsr, ethos, compare, command = None, timeout=0.2):
     while True:
         output = nbsr.readline(timeout) # give the shell some time to process
         if not output:
-            if command is not None:
-                print("the compare value was not found for command: " + command)
-            else:
-                print("the compare value was not found")
             break
         answer += output
         if command is not None:

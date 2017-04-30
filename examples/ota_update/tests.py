@@ -106,6 +106,7 @@ if not args.prepare:
         print("--------                normal update procedure               --------")
         print("----------------------------------------------------------------------")
         if test1.do_test(tty_out) != 0:
+            print(" [ERROR] test 1 failed somewhere, aborting test procedure now\n")
             sys.exit(-1)
 
 
@@ -123,22 +124,27 @@ if not args.prepare:
         print("----------------------------------------------------------------------")
         ### prepare some things first
         if test2.prepare(tty_out) != 0:
+            print(" [ERROR] test 2 (preparation) failed somewhere, aborting test procedure now\n")
             sys.exit(-1)
 
         ### Test 2a (update file with invalid file signature)
         if test2.do_part_a(tty_out) != 0:
+            print(" [ERROR] test 2A failed somewhere, aborting test procedure now\n")
             sys.exit(-1)
 
         ### Test 2b (update file with invalid hw_id)
         if test2.do_part_b(tty_out) != 0:
+            print(" [ERROR] test 2B failed somewhere, aborting test procedure now\n")
             sys.exit(-1)
 
         ### Test 2c (update file with lower fw_vers)
         if test2.do_part_c(tty_out) != 0:
+            print(" [ERROR] test 2C failed somewhere, aborting test procedure now\n")
             sys.exit(-1)
 
         ### tidy up
         if test2.finish(tty_out) != 0:
+            print(" [ERROR] test 2 (finishing) failed somewhere, aborting test procedure now\n")
             sys.exit(-1)
 
 

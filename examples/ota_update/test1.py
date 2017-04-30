@@ -36,7 +36,7 @@ def do_test(tty_out):
     time.sleep(1)
 
     ## start ethos console
-    ethos = subprocess.Popen("make ethos 2>" + tty_out, stdout=subprocess.PIPE, stdin=subprocess.PIPE, shell=True, preexec_fn=os.setsid)
+    ethos = subprocess.Popen("make ethos 2>/dev/null", stdout=subprocess.PIPE, stdin=subprocess.PIPE, shell=True, preexec_fn=os.setsid)
     time.sleep(1)
     # wrap p.stdout with a NonBlockingStreamReader object:
     nbsr = NBSR(ethos.stdout)
@@ -70,7 +70,7 @@ def do_test(tty_out):
         return -1
     elif ret_val == 0:
         print(" [ERROR] wrong firmware version or slot started")
-        print("dump fetched answer from device:\n" + answer)
+        print("dumping fetched answer from device:\n" + answer)
         kill_ethos(ethos)
         return -1
     print("    [OK] correct inital FW running")
@@ -92,7 +92,7 @@ def do_test(tty_out):
         return -1
     elif ret_val == 0:
         print(" [ERROR] wrong firmware version or slot started")
-        print("dump fetched answer from device:\n" + answer)
+        print("dumping fetched answer from device:\n" + answer)
         kill_ethos(ethos)
         return -1
     print("    [OK] correct FW running after flashing new update file")
@@ -105,7 +105,7 @@ def do_test(tty_out):
         return -1
     elif ret_val == 0:
         print(" [ERROR] installation of FW update not successful")
-        print("dump fetched answer from device:\n\n" + answer)
+        print("dumping fetched answer from device:\n\n" + answer)
         kill_ethos(ethos)
         return -1
     print("    [OK] FW update installation successful")
@@ -118,7 +118,7 @@ def do_test(tty_out):
         return -1
     elif ret_val == 0:
         print(" [ERROR] something bad happend before rebooting")
-        print("dump fetched answer from device:\n\n" + answer)
+        print("dumping fetched answer from device:\n\n" + answer)
         kill_ethos(ethos)
         return -1
     print("    [OK] reboot initiated")
@@ -133,7 +133,7 @@ def do_test(tty_out):
         return -1
     elif ret_val == 0:
         print(" [ERROR] wrong firmware version or slot started")
-        print("dump fetched answer from device:\n" + answer)
+        print("dumping fetched answer from device:\n" + answer)
         kill_ethos(ethos)
         return -1
     print("    [OK] correct FW running after flashing new update file")
@@ -154,7 +154,7 @@ def do_test(tty_out):
         return -1
     elif ret_val == 0:
         print(" [ERROR] wrong firmware version or slot started")
-        print("dump fetched answer from device:\n" + answer)
+        print("dumping fetched answer from device:\n" + answer)
         kill_ethos(ethos)
         return -1
     print("    [OK] correct FW running after flashing new update file")
@@ -167,7 +167,7 @@ def do_test(tty_out):
         return -1
     elif ret_val == 0:
         print(" [ERROR] installation of FW update not successful")
-        print("dump fetched answer from device:\n\n" + answer)
+        print("dumping fetched answer from device:\n\n" + answer)
         kill_ethos(ethos)
         return -1
     print("    [OK] FW update installation successful")
@@ -180,7 +180,7 @@ def do_test(tty_out):
         return -1
     elif ret_val == 0:
         print(" [ERROR] something bad happend before rebooting")
-        print("dump fetched answer from device:\n\n" + answer)
+        print("dumping fetched answer from device:\n\n" + answer)
         kill_ethos(ethos)
         return -1
     print("    [OK] reboot initiated")
@@ -195,7 +195,7 @@ def do_test(tty_out):
         return -1
     elif ret_val == 0:
         print(" [ERROR] wrong firmware version or slot started")
-        print("dump fetched answer from device:\n" + answer)
+        print("dumping fetched answer from device:\n" + answer)
         kill_ethos(ethos)
         return -1
     print("    [OK] correct FW running after flashing new update file")
@@ -216,7 +216,7 @@ def do_test(tty_out):
         return -1
     elif ret_val == 0:
         print(" [ERROR] wrong firmware version or slot started")
-        print("dump fetched answer from device:\n" + answer)
+        print("dumping fetched answer from device:\n" + answer)
         kill_ethos(ethos)
         return -1
     print("    [OK] correct FW running after flashing new update file")
@@ -229,7 +229,7 @@ def do_test(tty_out):
         return -1
     elif ret_val == 0:
         print(" [ERROR] installation of FW update not successful")
-        print("dump fetched answer from device:\n\n" + answer)
+        print("dumping fetched answer from device:\n\n" + answer)
         kill_ethos(ethos)
         return -1
     print("    [OK] FW update installation successful")
@@ -242,7 +242,7 @@ def do_test(tty_out):
         return -1
     elif ret_val == 0:
         print(" [ERROR] something bad happend before rebooting")
-        print("dump fetched answer from device:\n\n" + answer)
+        print("dumping fetched answer from device:\n\n" + answer)
         kill_ethos(ethos)
         return -1
     print("    [OK] reboot initiated")
@@ -257,7 +257,7 @@ def do_test(tty_out):
         return -1
     elif ret_val == 0:
         print(" [ERROR] wrong firmware version or slot started")
-        print("dump fetched answer from device:\n" + answer)
+        print("dumping fetched answer from device:\n" + answer)
         kill_ethos(ethos)
         return -1
     print("    [OK] correct FW running after flashing new update file")
