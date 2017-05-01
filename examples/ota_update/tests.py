@@ -91,6 +91,10 @@ if not args.fast:
     subprocess.call("FW_VERS=0x4 make sign-update-slot1 >" + tty_out, shell=True)
     subprocess.call("FW_VERS=0x4 make sign-update-slot2 >" + tty_out, shell=True)
 
+    if tests_en['t2']:
+        print("compiling and signing special file for Test 2A")
+        subprocess.call("HW_ID=0xbaadf00dbaadf00d FW_VERS=0x4 make ota_update_app-file-slot1 sign-update-slot1 >" + tty_out, shell=True)
+
 
 
 if not args.prepare:
@@ -130,16 +134,19 @@ if not args.prepare:
         ### Test 2a (update file with invalid file signature)
         if test2.do_part_a(tty_out) != 0:
             print(" [ERROR] test 2A failed somewhere, aborting test procedure now\n")
+            test2.finish(tty_out)
             sys.exit(-1)
 
         ### Test 2b (update file with invalid hw_id)
         if test2.do_part_b(tty_out) != 0:
             print(" [ERROR] test 2B failed somewhere, aborting test procedure now\n")
+            test2.finish(tty_out)
             sys.exit(-1)
 
         ### Test 2c (update file with lower fw_vers)
         if test2.do_part_c(tty_out) != 0:
             print(" [ERROR] test 2C failed somewhere, aborting test procedure now\n")
+            test2.finish(tty_out)
             sys.exit(-1)
 
         ### tidy up
