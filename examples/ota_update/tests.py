@@ -164,8 +164,9 @@ if not args.prepare:
         print("--------                        TEST 3                        --------")
         print("--------              power outage during update              --------")
         print("----------------------------------------------------------------------")
-        subprocess.call("FW_VERS=0x1 make merge-factory-hex >" + tty_out, shell=True)
-        # TODO: everything
+        if test3.do_test(tty_out) != 0:
+            print(" [ERROR] test 3 failed somewhere, aborting test procedure now\n")
+            sys.exit(-1)
 
 
     if tests_en['t4']:
@@ -178,8 +179,9 @@ if not args.prepare:
         print("--------                        TEST 4                        --------")
         print("--------              bitflip in installed update             --------")
         print("----------------------------------------------------------------------")
-        subprocess.call("FW_VERS=0x2 FW_VERS_2=0x3 make merge-test-hex >" + tty_out, shell=True)
-        # TODO: everything
+        if test4.do_test(tty_out) != 0:
+            print(" [ERROR] test 4 failed somewhere, aborting test procedure now\n")
+            sys.exit(-1)
 
 
 print("\n----------       All Requested OTA Update Tests Done        ----------\n")
