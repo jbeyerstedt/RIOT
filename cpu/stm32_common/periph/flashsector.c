@@ -35,7 +35,7 @@ void flashsector_write(int sector, void *data, int size)
     uint16_t *data_addr = (uint16_t *)data;
     uint32_t hsi_state = (RCC->CR & RCC_CR_HSION);
 
-    // /* the internal RC oscillator (HSI) must be enabled */
+    /* the internal RC oscillator (HSI) must be enabled */
     RCC->CR |= (RCC_CR_HSION);
     while (!(RCC->CR & RCC_CR_HSIRDY)) {
     }
@@ -76,8 +76,7 @@ void flashsector_write(int sector, void *data, int size)
         FLASH->CR |= FLASH_PSIZE_HALF_WORD; /* 16 bit programming */
         FLASH->CR |= FLASH_CR_PG;
         for (unsigned i = 0; i < (size / 2); i++) {
-            //*(__IO uint16_t*)sector_addr++ = data_addr[i];
-            *sector_addr++ = data_addr[i];
+            *(__IO uint16_t*)sector_addr++ = data_addr[i];
             while (FLASH->SR & FLASH_SR_BSY) {
             }
         }
@@ -103,7 +102,7 @@ void flashsector_write_only(void *target, void *data, int size) {
     __IO uint16_t *data_addr = (uint16_t *)data;
     uint32_t hsi_state = (RCC->CR & RCC_CR_HSION);
 
-    // /* the internal RC oscillator (HSI) must be enabled */
+    /* the internal RC oscillator (HSI) must be enabled */
     RCC->CR |= (RCC_CR_HSION);
     while (!(RCC->CR & RCC_CR_HSIRDY)) {
     }
