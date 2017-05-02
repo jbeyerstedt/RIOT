@@ -38,7 +38,6 @@ def do_test(tty_out):
     ## start ethos console
     ethos = subprocess.Popen("make ethos 2>/dev/null", stdout=subprocess.PIPE, stdin=subprocess.PIPE, shell=True, preexec_fn=os.setsid)
     time.sleep(1)
-    # wrap p.stdout with a NonBlockingStreamReader object:
     nbsr = NBSR(ethos.stdout)
 
     # get first diagnostic lines from ethos console
