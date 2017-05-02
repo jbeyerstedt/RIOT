@@ -81,6 +81,7 @@ def do_test(tty_out):
     print("(Step 2) write update file (fw_vers 2, slot 2) to device and initiate update")
     ## flash the update file
     if subprocess.call("FW_VERS=0x2 make flash-updatefile-slot2 >" + tty_out, shell=True):
+        kill_ethos(ethos)
         return -1
     time.sleep(1)
 
@@ -143,6 +144,7 @@ def do_test(tty_out):
 
     print("(Step 3) write update file (fw_vers 3, slot 1) to device and initiate update")
     if subprocess.call("FW_VERS=0x3 make flash-updatefile-slot1 >" + tty_out, shell=True):
+        kill_ethos(ethos)
         return -1
     time.sleep(1)
 
@@ -205,6 +207,7 @@ def do_test(tty_out):
 
     print("(Step 4) write update file (fw_vers 4, slot 2) to device and initiate update")
     if subprocess.call("FW_VERS=0x4 make flash-updatefile-slot2 >" + tty_out, shell=True):
+        kill_ethos(ethos)
         return -1
     time.sleep(1)
 

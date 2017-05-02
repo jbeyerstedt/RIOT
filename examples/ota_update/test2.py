@@ -84,6 +84,7 @@ def do_part_a(tty_out):
     subprocess.call("cat fw_update-orig-0x4-s1 | head -c -16 >fw_update-0xabc0123456789def-0x4-s1.bin", shell=True)
 
     if subprocess.call("FW_VERS=0x4 make flash-updatefile-slot1 >" + tty_out, shell=True):
+        kill_ethos(ethos)
         return -1
     time.sleep(1)
 
@@ -130,6 +131,7 @@ def do_part_b(tty_out):
     print("(Part B) testing hardware ID validation")
 
     if subprocess.call("HW_ID=0xbaadf00dbaadf00d FW_VERS=0x4 make flash-updatefile-slot1 >" + tty_out, shell=True):
+        kill_ethos(ethos)
         return -1
     time.sleep(1)
 
@@ -170,6 +172,7 @@ def do_part_c(tty_out):
 
     print("(Part C) testing FW update file signature validation")
     if subprocess.call("FW_VERS=0x1 make flash-updatefile-slot1 >" + tty_out, shell=True):
+        kill_ethos(ethos)
         return -1
     time.sleep(1)
 
