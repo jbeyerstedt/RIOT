@@ -1,0 +1,15 @@
+# additional targets for some specific needs of the test scripts
+
+include Makefile
+
+test4-hex:
+	srec_cat ota_bootloader.hex -intel -crop 0x08000000 $(FW_IMAGE1_OFFSET) \
+	fw_image-$(HW_ID)-$(FW_VERS)-s1.bin -binary -offset $(FW_IMAGE1_OFFSET) \
+	-crop $(FW_IMAGE1_OFFSET) $(FW_IMAGE1_END) \
+	fw_image-$(HW_ID)-$(FW_VERS_2)-s2.bin -binary -offset $(FW_IMAGE2_OFFSET) \
+	-crop $(FW_IMAGE2_OFFSET) $(FW_IMAGE2_END) \
+	-o hex-slotstest.hex -intel
+
+hw_reset:
+	OPENOCD_CONFIG=../../boards/$(BOARD)/dist/openocd.cfg \
+	../../dist/tools/openocd/openocd.sh reset 2>&1

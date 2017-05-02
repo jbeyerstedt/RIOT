@@ -76,7 +76,7 @@ def do_part_a(tty_out):
     global nbsr
     global ethos
 
-    subprocess.call("cp fw_update-0xabc0123456789def-0x4-s1.bin fw_update-orig-0x4-s1", shell=True)
+    subprocess.call("cp -p fw_update-0xabc0123456789def-0x4-s1.bin fw_update-orig-0x4-s1", shell=True)
 
     print("(Part A) testing FW update file signature validation")
     # manipulate some bits of the vers 4, slot 1 file

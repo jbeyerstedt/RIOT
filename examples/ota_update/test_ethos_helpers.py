@@ -35,7 +35,6 @@ def ethos_command(nbsr, ethos, compare, command = None, timeout=0.2):
             if compare in output:
                 return 1, answer
         round += 1
-        # print output
     if round == 0:
         return -1, answer   # no output was fetched at all
     return 0, answer        # compare string was not found
