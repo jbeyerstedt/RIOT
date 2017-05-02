@@ -45,7 +45,7 @@ void iwdg_start_and_configure(void)
 {
     /* configure watchdog */
     IWDG->KR = 0x5555;
-    IWDG->PR = 0x02;    /* 2048 ms timeout */
+    IWDG->PR = 0x03;    /* 4096 ms timeout, because of slow flash erase */
 
     /* activate */
     IWDG->KR = 0xCCCC;
@@ -133,11 +133,11 @@ int main(void)
                     uint16_t slot_fw_vers = slot_metadata.fw_vers;
                     if (file_fw_vers <= slot_fw_vers) {
                         /* delete newest FW slot */
-                        printf("> incomplete installation detected, erasing slot\n");
+                        printf("=> incomplete installation detected, erasing slot\n");
                         flashsector_write(get_slot_page(boot_slot), NULL, 0);
                     }
                     else {
-                        DEBUG("> the cause must be a bitflip somewhere\n");
+                        DEBUG("=> the cause must be a bitflip somewhere\n");
                     }
                 }
 
@@ -159,11 +159,11 @@ int main(void)
                 uint16_t slot_fw_vers = slot_metadata.fw_vers;
                 if (file_fw_vers <= slot_fw_vers) {
                     /* delete the malicious update file */
-                    printf("> update file matches installed FW, erasing update file\n");
+                    printf("=> update file matches installed FW, erasing update file\n");
                     flashsector_write(OTA_FILE_SLOT_START_SECTOR, NULL, 0);
                 }
                 else {
-                    DEBUG("> reason unknown\n");
+                    DEBUG("=> reason unknown\n");
                 }
             }
 
