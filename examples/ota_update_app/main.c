@@ -19,9 +19,13 @@
  */
 
 #include <stdio.h>
+#include "msg.h"
 
 #include "shell.h"
-#include "msg.h"
+
+#include "net/gcoap.h"
+#include "kernel_types.h"
+
 #include "thread.h"
 #include "xtimer.h"
 #include "ota_updater.h"
@@ -31,6 +35,10 @@
 
 #define MAIN_QUEUE_SIZE     (8)
 static msg_t _main_msg_queue[MAIN_QUEUE_SIZE];
+
+/* from gcoap example */
+extern int gcoap_cli_cmd(int argc, char **argv);
+extern void gcoap_cli_init(void);
 
 char wdg_thread_stack[THREAD_STACKSIZE_MAIN];
 
@@ -86,6 +94,7 @@ static const shell_command_t shell_commands[] = {
     { "ota_reboot", "Reboot device", ota_reboot_cmd },
     { "view_slots", "View FW slots", view_slots_cmd },
     { "fw_info", "View FW version and slot number", fw_info_cmd },
+    { "coap", "CoAP example", gcoap_cli_cmd },
     { NULL, NULL, NULL }
 };
 
@@ -105,6 +114,7 @@ int main(void)
     /* we need a message queue for the thread running the shell in order to
      * receive potentially fast incoming networking packets */
     msg_init_queue(_main_msg_queue, MAIN_QUEUE_SIZE);
+    gcoap_cli_init();
 
     OTA_FW_metadata_t slot_metadata;
     ota_slots_get_int_slot_metadata(FW_SLOT, &slot_metadata);

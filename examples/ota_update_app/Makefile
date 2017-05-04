@@ -7,41 +7,64 @@ BOARD ?= nucleo-f411
 # This has to be the absolute path to the RIOT base directory:
 RIOTBASE ?= $(CURDIR)/../..
 
+# copied from gnrc_networking
 BOARD_INSUFFICIENT_MEMORY := calliope-mini chronos microbit msb-430 msb-430h \
                              nucleo32-f031 nucleo32-f042 nucleo32-f303 nucleo32-l031 \
                              nucleo-f030 nucleo-f070 nucleo-f072 nucleo-f103 nucleo-f302 \
                              nucleo-f334 nucleo-l053 spark-core stm32f0discovery telosb \
                              weio wsn430-v1_3b wsn430-v1_4 z1
 
+# Must read nordic_softdevice_ble package before nanocoap package. However,
+# can't read it explicitly here because it is read later, as a dependency for
+# the nrf52dk board.
+BOARD_BLACKLIST := nrf52dk
+
+## Uncomment to redefine port, for example use 61616 for RFC 6282 UDP compression.
+#GCOAP_PORT = 5683
+#CFLAGS += -DGCOAP_PORT=$(GCOAP_PORT)
+
+## Uncomment to redefine request token length, max 8.
+#GCOAP_TOKENLEN = 2
+#CFLAGS += -DGCOAP_TOKENLEN=$(GCOAP_TOKENLEN)
+
+USEPKG += nanocoap
+# Required by nanocoap, but only due to issue #5959.
+USEMODULE += posix
+
 # Include packages that pull up and auto-init the link layer.
 # NOTE: 6LoWPAN will be included if IEEE802.15.4 devices are present
 USEMODULE += gnrc_netdev_default
 USEMODULE += auto_init_gnrc_netif
-# Specify the mandatory networking modules for IPv6 and UDP
-USEMODULE += gnrc_ipv6_router_default
-USEMODULE += gnrc_udp
-# Add a routing protocol
-USEMODULE += gnrc_rpl
-USEMODULE += auto_init_gnrc_rpl
+# Specify the mandatory networking modules
+USEMODULE += gnrc_ipv6_default
+USEMODULE += gnrc_sock_udp
+USEMODULE += gcoap
 # This application dumps received packets to STDIO using the pktdump module
 USEMODULE += gnrc_pktdump
 # Additional networking modules that can be dropped if not needed
 USEMODULE += gnrc_icmpv6_echo
+
+# Required by gcoap example
+USEMODULE += od
+USEMODULE += fmt
 # Add also the shell, some shell commands
 USEMODULE += shell
 USEMODULE += shell_commands
 USEMODULE += ps
+
+# modules from gnrc_networking example
 USEMODULE += netstats_l2
 USEMODULE += netstats_ipv6
 USEMODULE += netstats_rpl
 
+# modules used for the ota update
 USEMODULE += ota_updater
-
 USEMODULE += xtimer
 
 # tweetnacl needs more stack
 CFLAGS += '-DTHREAD_STACKSIZE_MAIN=(THREAD_STACKSIZE_DEFAULT + 3072)'
 
+# settings for ethos
 GNRC_NETIF_NUMOF := 2
 USEMODULE += ethos gnrc_netdev
 CFLAGS += '-DETHOS_UART=UART_DEV(0)' -DETHOS_BAUDRATE=115200 -DUSE_ETHOS_FOR_STDIO
