@@ -7,7 +7,7 @@
 # General Public License v2.1. See the file LICENSE in the top level
 # directory for more details.
 
-# bootloadr communication helpers for tests.py and the test modules
+# bootloader communication helpers for tests.py and the test modules
 
 
 import serial
@@ -34,7 +34,11 @@ def bootloader_get_cmd(compare, timeout=1):
 
     if bootloader != None:
         while True:
-            bldr_msg = bootloader.readline()
+            try:
+                bldr_msg = bootloader.readline()
+            except serial.serialutil.SerialException:
+                print(" [ERROR] serial exception in bootloader_get_cmd")
+                return -3, ""
             if bldr_msg:
                 answer += bldr_msg
                 if compare in bldr_msg:
@@ -50,4 +54,11 @@ def bootloader_get_cmd(compare, timeout=1):
             return -1, answer   # no output was fetched at all
         return 0, answer        # compare string was not found
 
-    return -2
+    return -2, ""
+
+
+def bootloader_close():
+    global bootloader
+
+    bootloader.close()
+    time.sleep(0.1)

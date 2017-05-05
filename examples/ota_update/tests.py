@@ -16,7 +16,6 @@ import os
 import signal
 import argparse
 
-from test_ethos_helpers import ethos_command
 import test1
 import test2
 import test3
@@ -160,6 +159,10 @@ if not args.prepare:
         # dependencies: bootloader
         #               app_binary-*-0x1-s1 for fw_image-*-0x1-s1
         #               app_binary-*-0x2-s2 for fw_update-*-0x2-s2
+
+        # for this test, the nucleo board must be connected first (using /dev/ttyACM0)
+        # and the arduino uno must be connected second (using /dev/ttyACM1)
+        # the serial interfaces used are currently hard coded!
         print("\n----------------------------------------------------------------------")
         print("--------                        TEST 3                        --------")
         print("--------              power outage during update              --------")

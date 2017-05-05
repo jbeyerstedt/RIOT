@@ -129,7 +129,7 @@ int ota_file_validate_file(uint32_t file_address)
         DEBUG("[ota_file] crypto_box decryption successful! verifying...\n");
         for (int i = 0; i < SHA256_DIGEST_LENGTH; i++) {
             if (hash[i] != (sign_hash[i + crypto_box_ZEROBYTES])) {
-                printf("[ota_file] INFO incorrect decrypted hash!\n");
+                printf("[ota_file] INFO incorrect decrypted hash!\n"); /* message needed for tests */
                 return 1;
             }
         }
@@ -217,7 +217,7 @@ int ota_file_write_image(uint32_t file_address, uint8_t fw_slot)
     file_read_addr += OTA_FILE_HEADER_SPACE;
 
     /* copy binary */
-    DEBUG("[ota_file] INFO start decrypting and writing binary data\n");
+    printf("[ota_file] INFO start decrypting and writing binary data\n"); /* message needed for tests */
     uint32_t encrypted_size = fw_binary_size + (AES_BLOCK_SIZE - fw_binary_size % AES_BLOCK_SIZE);
     uint32_t binary_sections = encrypted_size / sizeof(buffer);
     uint32_t binary_sections_rest = encrypted_size % sizeof(buffer);
