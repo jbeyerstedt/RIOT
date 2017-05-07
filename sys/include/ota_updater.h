@@ -23,19 +23,47 @@
 
 #include "ota_file.h"
 
-#define OTA_CONTINUE_INSTALL    (2)     /* status code for interrupted update */
+/**
+ *  @brief OTA_CONTINUE_INSTALL:
+ *         return value, if an interrupted update was detected
+ */
+#define OTA_CONTINUE_INSTALL    (2)
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /**
- * @brief      Send request to update server, if an update is available
+ * @brief update_status_t:
+ *        possible values of the update status. The status of an update request
+ *        must be polled via the ota_updater_get_status() function.
+ */
+typedef enum update_status {
+    NOT_CHECKED,
+    INTERRUPTED_UPDATE,
+    PENDING_REQUEST,
+    UPDATE_AVAILABLE,
+    NO_UPDATE_AVAILABLE,
+    REQUEST_ERROR
+} ota_updater_status_t;
+
+/**
+ * @brief      Send request to update server, to check if an update is available
+ *             Because of the asyncronous CoAP interface, this function will
+ *             not return, if an update is available
  *
- * @return     1 if new firmware available, 0 if not, -1 on error or
+ * @return     0 on success, -1 on error or
  *             OTA_CONTINUE_INSTALL if an interrupted update is detected
  */
 int ota_updater_request_update(void);
+
+/**
+ * @brief      Get the content of the update status variable of type
+ *             ota_updater_status_t
+ *
+ * @return     status of the update request
+ */
+ota_updater_status_t ota_updater_get_status(void);
 
 /**
  * @brief      Download the requested update file.

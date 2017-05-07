@@ -104,6 +104,11 @@ updatefiles-ready: updatefiles-prepare sign-updatefiles
 sign-updatefiles: sign-update-slot1 sign-update-slot2
 	@true
 
+# deploy the update files by sending them to the server
+updatefiles-deploy:
+	@cp ./fw_update-$(HW_ID)-$(FW_VERS)-s1.bin ../ota_update_server/
+	@cp ./fw_update-$(HW_ID)-$(FW_VERS)-s2.bin ../ota_update_server/
+
 sign-update-slot1:
 	../../dist/tools/ota_update_filesign/bin/./generate-ota_update_file \
 	app_binary-$(HW_ID)-$(FW_VERS)-s1.bin \
