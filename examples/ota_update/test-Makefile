@@ -13,3 +13,13 @@ test4-hex:
 hw_reset:
 	OPENOCD_CONFIG=../../boards/$(BOARD)/dist/openocd.cfg \
 	../../dist/tools/openocd/openocd.sh reset 2>&1
+
+
+test5-app:
+	@cd ../default; \
+	BOARD=$(BOARD) CFLAGS="-DFW_SLOT=2 -DFW_SLOTS=1 -DOTA_UPDATE=$(OTA_UPDATE)" \
+	FW_SLOT=2 OTA_HW_ID=$(HW_ID) OTA_FW_VERS=$(FW_VERS) \
+	OTA_UPDATE=$(OTA_UPDATE) OTA_FW_METADATA_SPACE=$(OTA_FW_METADATA_SPACE) \
+	OTA_FW_BASE_ADDR=$(FW_IMAGE1_BASE) \
+	make -j 4 all; \
+	cp bin/$(BOARD)/app_binary-$(HW_ID)-$(FW_VERS)-s2.bin ../ota_update

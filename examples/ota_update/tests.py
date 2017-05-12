@@ -20,6 +20,7 @@ import test1
 import test2
 import test3
 import test4
+import test5
 
 ### parse the command line arguments
 print("----------         Welcome to the OTA Update Tests          ----------")
@@ -40,7 +41,7 @@ if args.o:
     tty_out = args.o
     print("[OPTIONS] make and flash commands will output to: " + args.o)
 
-tests_en = {'t1':True, 't2':True, 't3':True, 't4':True}
+tests_en = {'t1':True, 't2':True, 't3':True, 't4':True, 't5':True}
 if args.test:
     sys.stdout.write("[OPTIONS] only executing test(s): ")
 
@@ -184,6 +185,19 @@ if not args.prepare:
         print("----------------------------------------------------------------------")
         if test4.do_test(tty_out) != 0:
             print(" [ERROR] test 4 failed somewhere, aborting test procedure now\n")
+            sys.exit(-1)
+
+
+    if tests_en['t5']:
+        ### TEST 5 (bootloop or unresponsive FW)
+        # dependencies: bootloader
+        #               TODO
+        print("\n----------------------------------------------------------------------")
+        print("--------                        TEST 5                        --------")
+        print("--------              bootloop or unresponsive FW             --------")
+        print("----------------------------------------------------------------------")
+        if test5.do_test(tty_out) != 0:
+            print(" [ERROR] test 5 failed somewhere, aborting test procedure now\n")
             sys.exit(-1)
 
 
