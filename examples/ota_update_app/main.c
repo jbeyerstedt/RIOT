@@ -104,7 +104,7 @@ void *wdg_thread(void *arg)
         /* reset the watchdog (IWGD) timer */
         IWDG->KR = 0xAAAA;
 
-        xtimer_usleep(250000);      /* wdg timeout is 512 ms */
+        xtimer_usleep(250000);      /* wdg timeout is 4096 ms */
     }
     return NULL;
 }
