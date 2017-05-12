@@ -66,12 +66,7 @@ int ota_updater_flash_write(void)
 {
     OTA_File_header_t *file_header = (OTA_File_header_t *)(OTA_FILE_SLOT);
     uint32_t file_address = OTA_FILE_SLOT;
-    uint8_t fw_slot = ota_slots_find_empty_int_slot();
-
-    if (0 == fw_slot) {
-        printf("[ota_updater] ERROR getting oldest FW slot\n");
-        return -1;
-    }
+    uint8_t fw_slot = (FW_SLOT == 1) ? 2 : 1;
 
     /* check if update file is suitable for selected slot */
     if (get_slot_address(fw_slot) != (file_header->fw_header.fw_metadata.fw_base_addr - OTA_VTOR_ALIGN)) {
